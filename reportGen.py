@@ -272,6 +272,45 @@ class EditScreen(Screen):
         self.ids.container.add_widget(scroll_view)
         self.ids.container.add_widget(Widget())
 
+
+    def create_button_fields(self, box_layout, sheet_index):
+        # Clear the BoxLayout
+        box_layout.clear_widgets()
+        self.ids.container.clear_widgets()
+        # Get the current sheet
+        sheet = self.sheets[sheet_index]
+        worksheet = self.workbook[sheet]
+
+        # Get the first row
+        row = worksheet[1]
+        val = []
+
+
+        # Create a button for each cell in the row
+        for i in range(0, len(row), 2):
+            cell1 = row[i]
+            cell2 = row[i+1]
+            if cell1.value and cell2.value:
+                common_text = get_common_text(cell1.value, cell2.value)
+                component = BoxLayout(orientation='horizontal', size_hint_y=None, height=dp(40))
+                label = MDLabel(text=common_text)
+                button1 = MDRaisedButton(text='Term 1')
+                button2 = MDRaisedButton(text='Term 2')
+                component.add_widget(label)
+                component.add_widget(button1)
+                component.add_widget(button2)
+                box_layout.add_widget(component)
+
+
+        # # Create a MDTextField for each cell in the row
+        # for cell in row:
+        #     if cell.value:
+        #         text_field = MDTextField(hint_text=str(cell.value), text=str(worksheet.cell(row=self.selected_row, column=cell.column).value) if worksheet.cell(row=self.selected_row, column=cell.column).value else "")
+        #         box_layout.add_widget(text_field)
+
+        next_button = MDRaisedButton(text='Next', on_release=self.on_next_button_click, pos_hint={"center_x": 0.5})
+        box_layout.add_widget(next_button)
+
     def create_text_fields(self, box_layout, sheet_index):
         # Clear the BoxLayout
         box_layout.clear_widgets()
@@ -319,7 +358,10 @@ class EditScreen(Screen):
 
         # If there are more sheets, create text fields for the next sheet
         if self.current_sheet_index < len(self.sheets):
-            self.create_text_fields(box_layout, self.current_sheet_index)
+            if self.sheets[self.current_sheet_index] in ['cover_page','first_page']:
+                self.create_text_fields(box_layout, self.current_sheet_index)
+            else:
+                self.create_button_fields(box_layout, self.current_sheet_index)
             self.ids.container.add_widget(Widget())
             self.ids.container.add_widget(scroll_view)
             self.ids.container.add_widget(Widget())
@@ -604,6 +646,36 @@ class AddScreen(Screen):
         self.ids.container.add_widget(scroll_view)
         self.ids.container.add_widget(Widget())
 
+    def create_button_fields(self, box_layout, sheet_index):
+        # Clear the BoxLayout
+        box_layout.clear_widgets()
+        self.ids.container.clear_widgets()
+        # Get the current sheet
+        sheet = self.sheets[sheet_index]
+        worksheet = self.workbook[sheet]
+
+        # Get the first row
+        row = worksheet[1]
+        val = []
+
+        # Create a button for each cell in the row
+        for i in range(0, len(row), 2):
+            cell1 = row[i]
+            cell2 = row[i+1]
+            if cell1.value and cell2.value:
+                common_text = get_common_text(cell1.value, cell2.value)
+                component = BoxLayout(orientation='horizontal', size_hint_y=None, height=dp(40))
+                label = MDLabel(text=common_text)
+                button1 = MDRaisedButton(text='Term 1')
+                button2 = MDRaisedButton(text='Term 2')
+                component.add_widget(label)
+                component.add_widget(button1)
+                component.add_widget(button2)
+                box_layout.add_widget(component)
+
+        next_button = MDRaisedButton(text='Next', on_release=self.on_next_button_click, pos_hint={"center_x": 0.5})
+        box_layout.add_widget(next_button)
+
     def create_text_fields(self, box_layout, sheet_index):
         # Clear the BoxLayout
         box_layout.clear_widgets()
@@ -650,12 +722,15 @@ class AddScreen(Screen):
 
         # If there are more sheets, create text fields for the next sheet
         if self.current_sheet_index < len(self.sheets):
-            self.create_text_fields(box_layout, self.current_sheet_index)
+            if self.sheets[self.current_sheet_index] in ['cover_page','first_page']:
+                self.create_text_fields(box_layout, self.current_sheet_index)
+            else:
+                self.create_button_fields(box_layout, self.current_sheet_index)
             self.ids.container.add_widget(Widget())
             self.ids.container.add_widget(scroll_view)
             self.ids.container.add_widget(Widget())
         else:
-            #             display its done and add a home button
+            #display its done and add a home button
             self.ids.container.clear_widgets()
             self.ids.container.add_widget(Widget())
             self.ids.container.add_widget(MDLabel(text='Done', halign='center', theme_text_color='Primary'))
@@ -684,19 +759,19 @@ class MainApp(MDApp):
         self.sm.add_widget(AddScreen(name='add'))
 
         # Create or connect to the SQLite database
-        self.conn = sqlite3.connect('mydatabase.db')
-        self.cursor = self.conn.cursor()
+        # self.conn = sqlite3.connect('mydatabase.db')
+        # self.cursor = self.conn.cursor()
 
-        # Create a table if it doesn't exist
-        self.cursor.execute('''CREATE TABLE IF NOT EXISTS Person (
-                                       id INTEGER PRIMARY KEY,
-                                       name TEXT,
-                                       age INTEGER)''')
-        self.cursor.execute('''CREATE TABLE IF NOT EXISTS Cookies (
-                                Name TEXT PRIMARY KEY,
-                                Value TEXT
-            )''')
-        self.conn.commit()
+        # # Create a table if it doesn't exist
+        # self.cursor.execute('''CREATE TABLE IF NOT EXISTS Person (
+        #                                id INTEGER PRIMARY KEY,
+        #                                name TEXT,
+        #                                age INTEGER)''')
+        # self.cursor.execute('''CREATE TABLE IF NOT EXISTS Cookies (
+        #                         Name TEXT PRIMARY KEY,
+        #                         Value TEXT
+        #     )''')
+        # self.conn.commit()
         data = {"request": "access"}
         # cookies = {"sessionid": get_sessionid(self.cursor)}
         headers = {'Authorization': f'Token {get_stored_token()}'}
@@ -783,7 +858,18 @@ def get_stored_token():
     except FileNotFoundError:
         return ""
 
+def get_common_text(text1, text2):
+    text1 = text1.split(' ')
+    text2 = text2.split(' ')
+    common_text = []
+    for t1, t2 in zip(text1, text2):
+        if t1 == t2:
+            common_text.append(t1)
+        else:
+            break
+    return ' '.join(common_text).strip('term').strip()
 
+# get the scheme from the server and store it if its updated
 def get_data_scheme():
     global url
     data = {"request": "scheme"}
@@ -797,8 +883,6 @@ def get_data_scheme():
                 old_scheme = json.load(f)
             if old_scheme != new_scheme:
                 print("Database scheme has changed.")
-                with open('scheme.json', 'w') as f:
-                    json.dump(new_scheme, f)
                 update_database(new_scheme)
             else:
                 print("Database scheme is up-to-date.")
@@ -808,6 +892,7 @@ def get_data_scheme():
             create_database()
     else:
         print("Failed to get the scheme")
+
 
 
 def update_database(new_scheme):
@@ -854,8 +939,9 @@ def create_database():
                         for sub in sub_li:
                             li=sub['learning_outcome']
                             for l in li:
-                                worksheet.cell(row=1, column=1+i, value=l['code'])
-                                i += 1
+                                worksheet.cell(row=1, column=i + 1, value=l['code']+" term 1")
+                                worksheet.cell(row=1, column=i+2, value=l['code']+" term 2")
+                                i += 2
             workbook.save(file_path)
 
 
