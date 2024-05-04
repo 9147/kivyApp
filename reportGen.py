@@ -1,33 +1,47 @@
+import math
 import os
 import shutil
 from kivy.lang import Builder
 from kivy.metrics import dp
+from kivy.core.window import Window
 from kivy.uix.boxlayout import BoxLayout
 from kivy.uix.widget import Widget
 from kivymd.app import MDApp
 from kivy.uix.screenmanager import ScreenManager, Screen
 from kivymd.uix.boxlayout import MDBoxLayout
 from kivymd.uix.button import MDRaisedButton
-from kivymd.uix.filemanager import MDFileManager
 from kivymd.uix.label import MDLabel
 from kivymd.toast import toast
 from kivymd.uix.snackbar import MDSnackbar, MDSnackbarActionButton
-from kivymd.uix.menu import MDDropdownMenu
+from kivymd.uix.button import MDFlatButton
+from kivymd.uix.dialog import MDDialog
+from kivymd.uix.button import MDFlatButton
+from kivymd.uix.button import MDRectangleFlatIconButton
+from kivymd.uix.textfield import MDTextField
+from kivymd.uix.list import OneLineAvatarIconListItem
+from kivymd.uix.list import IconRightWidget
 import glob
 import requests
-import sqlite3
+from kivymd.uix.filemanager import MDFileManager
 import json
 from openpyxl import load_workbook
 from openpyxl.workbook import Workbook
 from kivy.uix.scrollview import ScrollView
 from kivymd.uix.textfield import MDTextField
 from fpdf import FPDF
-from kivy.uix.filechooser import FileChooser
+import os
 
 url = "http://127.0.0.1:8000/"
 
 Builder.load_string('''
 #:import toast kivymd.toast.toast
+                    
+<ItemConfirm>
+    on_release: root.set_icon(check)
+
+    CheckboxLeftWidget:
+        id: check
+        group: "check"
 
 <LoginScreen>:
     orientation: "vertical"
@@ -157,6 +171,120 @@ Builder.load_string('''
 
 ''')
 
+class CustomFileManager(MDFileManager):
+    def show(self, path):
+        '''Forms the body of a directory. Called when opening a directory.'''
+
+        self.current_path = path
+        super().show(path)
+        self.selection_button.opacity = 0  # hide the selection_button
+        self.selection_button.disabled = True 
+
+
+class ImageManager():
+    def __init__(self):
+        Window.bind(on_keyboard=self.events)
+        self.manager_open = False
+        self.instance = None
+        self.file_manager = CustomFileManager(
+            exit_manager=self.exit_manager, 
+            select_path=self.select_path,
+            ext=['.jpg', '.png', '.jpeg'],# only show these types of files
+            preview=True, # allow preview of images
+            icon_selection_button="none",
+        )
+
+    def file_manager_open(self,instance):
+        print(instance)
+        self.instance=instance
+        self.file_manager.show(os.path.expanduser("~"))  # output manager to the screen
+        self.manager_open = True
+
+    def select_path(self, path: str):
+        '''
+        It will be called when you click on the file name
+        or the catalog selection button.
+
+        :param path: path to the selected directory or file;
+        '''
+        # get file name
+        self.instance.text=path
+        self.exit_manager()
+        self.instance= None
+        toast(path)
+
+    def exit_manager(self, *args):
+        '''Called when the user reaches the root of the directory tree.'''
+        self.instance=None
+        self.manager_open = False
+        self.file_manager.close()
+
+    def events(self, instance, keyboard, keycode, text, modifiers):
+        '''Called when buttons are pressed on the mobile device.'''
+
+        if keyboard in (1001, 27):
+            if self.manager_open:
+                self.file_manager.back()
+        return True
+    
+
+class SaveImage:
+    def __init__(self):
+        pass
+
+    def addImage(self, index, from_path, to_path):
+        if index == 0:
+            self.MeImage = [from_path, to_path]
+        if index == 1:
+            self.FamilyImage = [from_path, to_path]
+
+    def save_image(self):
+        shutil.copy(self.MeImage[0], self.MeImage[1])
+        shutil.copy(self.FamilyImage[0], self.FamilyImage[1])
+
+
+
+
+class ItemConfirm(OneLineAvatarIconListItem):
+    divider = None
+
+    def on_release(self):
+        if self.text.startswith("Other"):
+            self.dialog = MDDialog(
+                title="Enter your text",
+                type="custom",
+                content_cls=MDTextField(),
+                buttons=[
+                    MDFlatButton(
+                        text="CANCEL",
+                        theme_text_color="Custom",
+                        text_color=self.theme_cls.primary_color,
+                        on_release=self.close_dialog,
+                    ),
+                    MDFlatButton(
+                        text="OK",
+                        theme_text_color="Custom",
+                        text_color=self.theme_cls.primary_color,
+                        on_release=self.close_dialog_with_input,
+                    ),
+                ],
+            )
+            self.dialog.open()
+        else:
+            super().on_release()
+
+    def close_dialog(self, *args):
+        self.dialog.dismiss()
+    
+    def set_icon(self, icon_name):
+        # change icon of the checkbox
+        self.ids.check.active = True
+
+    def close_dialog_with_input(self, *args):
+        # change this text of other to input text
+        self.text = "Other ("+self.dialog.content_cls.text+")"
+        self.dialog.dismiss()
+
 
 class LoginScreen(Screen, MDBoxLayout):
     pass
@@ -171,10 +299,13 @@ class HomeScreen(Screen):
 class EditScreen(Screen):
     def __init__(self, **kw):
         super().__init__(**kw)
+        self.file_manager = ImageManager()
         self.selected_row = None
         self.workbook_active = None
         self.workbook = None
+        self.newImage=None
         self.sheets = None
+        self.dialog = None
         self.current_sheet_index = 0
         self.values = []
 
@@ -281,10 +412,9 @@ class EditScreen(Screen):
         sheet = self.sheets[sheet_index]
         worksheet = self.workbook[sheet]
 
-        # Get the first row
+                # Get the first row
         row = worksheet[1]
         val = []
-
 
         # Create a button for each cell in the row
         for i in range(0, len(row), 2):
@@ -292,10 +422,12 @@ class EditScreen(Screen):
             cell2 = row[i+1]
             if cell1.value and cell2.value:
                 common_text = get_common_text(cell1.value, cell2.value)
-                component = BoxLayout(orientation='horizontal', size_hint_y=None, height=dp(40))
+                component = BoxLayout(orientation='horizontal',size_hint=(None, None), size=(400, 60))
                 label = MDLabel(text=common_text)
-                button1 = MDRaisedButton(text='Term 1')
-                button2 = MDRaisedButton(text='Term 2')
+                val1=str(worksheet.cell(row=self.selected_row, column=cell1.column).value)
+                val2=str(worksheet.cell(row=self.selected_row, column=cell2.column).value)
+                button1 = MDRaisedButton(text="Term 1" if val1==str(None) else val1, on_press=lambda x: change_text_field(x),id=common_text+'1')
+                button2 = MDRaisedButton(text="Term 2" if val2==str(None) else val2,on_press=lambda x: change_text_field(x),id=common_text+'2')
                 component.add_widget(label)
                 component.add_widget(button1)
                 component.add_widget(button2)
@@ -307,6 +439,32 @@ class EditScreen(Screen):
         #     if cell.value:
         #         text_field = MDTextField(hint_text=str(cell.value), text=str(worksheet.cell(row=self.selected_row, column=cell.column).value) if worksheet.cell(row=self.selected_row, column=cell.column).value else "")
         #         box_layout.add_widget(text_field)
+
+        next_button = MDRaisedButton(text='Next', on_release=self.on_next_button_click, pos_hint={"center_x": 0.5})
+        box_layout.add_widget(next_button)
+
+    def create_feedback_fields(self, box_layout, sheet_index):
+        # Clear the BoxLayout
+        box_layout.clear_widgets()
+        self.ids.container.clear_widgets()
+        # Get the current sheet
+        sheet = self.sheets[sheet_index]
+        worksheet = self.workbook[sheet]
+
+        # Get the first row
+        row = worksheet[1]
+
+        # Create a button for each cell in the row
+        for i in range(0, len(row)):
+                component = BoxLayout(orientation='horizontal',size_hint=(None, None), size=(400, 60))
+                label = MDLabel(text=row[i].value)
+                val=str(worksheet.cell(row=self.selected_row, column=row[i].column).value)
+                # a button with dropdown arrow on the right
+
+                button1 = MDRectangleFlatIconButton(text="None" if val==str(None) else val,icon="menu-down", on_press=lambda x:self.show_confirmation_dialog(x),id=row[i].value)
+                component.add_widget(label)
+                component.add_widget(button1)
+                box_layout.add_widget(component)
 
         next_button = MDRaisedButton(text='Next', on_release=self.on_next_button_click, pos_hint={"center_x": 0.5})
         box_layout.add_widget(next_button)
@@ -332,19 +490,142 @@ class EditScreen(Screen):
         next_button = MDRaisedButton(text='Next', on_release=self.on_next_button_click, pos_hint={"center_x": 0.5})
         box_layout.add_widget(next_button)
 
+    def show_confirmation_dialog(self,instance):
+        feedbacks_options=[]
+        with open('scheme.json') as f:
+            data = json.load(f)
+            for d in data['classes']:
+                if d['name'] == self.workbook_active.split('.')[0]:
+                    data = d
+                    break
+            data=data['feedback_page']['sections']
+            for d in data:
+                for d1 in d['Fields']:
+                    if d1['name'] == instance.id:
+                        feedbacks_options = d1["options"]
+                        break
+
+        item=[ItemConfirm(text=i['choice']) for i in feedbacks_options]
+        item.append(ItemConfirm(text='Other'))
+        # print(feedbacks_options)
+        self.dialog = MDDialog(
+            title=instance.id,
+            # feedbacks=feedbacks,
+            type="confirmation",
+            items=item,
+            buttons=[
+                MDFlatButton(
+                    text="CANCEL",
+                    theme_text_color="Custom",
+                    on_release=self.close_dialog,
+                ),
+                MDFlatButton(
+                    text="OK",
+                    theme_text_color="Custom",
+                    on_release=lambda x:self.close_dialog(x, True,instance),
+                ),
+            ],
+        )
+        self.dialog.open()
+
+    def close_dialog(self, inst, update=False,instance=None):
+        if update:
+            val=[i.text for i in self.dialog.items if i.ids.check.active]
+            # updated the text of button that has colled the function
+            if len(val)>0:
+                instance.text=val[0]
+        self.dialog.dismiss()
+
+    def create_image_fields(self, box_layout, sheet_index):
+        # Clear the BoxLayout
+        box_layout.clear_widgets()
+        self.ids.container.clear_widgets()
+        # Get the current sheet
+        sheet = self.sheets[sheet_index]
+        worksheet = self.workbook[sheet]
+
+        # Get the first row
+        row = worksheet[1]
+
+        # Create a button for each cell in the row
+        for cell in row:
+            if cell.value:
+                component = BoxLayout(orientation='horizontal',size_hint=(None, None), size=(400, 60))
+                label = MDLabel(text=cell.value)
+                val=str(worksheet.cell(row=self.selected_row, column=cell.column).value)
+                # a button with dropdown arrow on the right
+                button1 = MDRectangleFlatIconButton(text="None" if val==str(None) else val,id=cell.value,icon="folder")
+                button1.bind( on_press=lambda x,button1=button1:self.file_manager.file_manager_open(button1))
+                component.add_widget(label)
+                component.add_widget(button1)
+                box_layout.add_widget(component)
+
+        next_button = MDRaisedButton(text='Next', on_release=self.on_next_button_click, pos_hint={"center_x": 0.5})
+        box_layout.add_widget(next_button)
+
     def on_next_button_click(self, instance):
-        # Increment the current sheet index
-        self.current_sheet_index += 1
         # iterate throught the text fields and get the values
         value_li = []
-        for child in self.ids.container.children:
-            if isinstance(child, ScrollView):
-                for widget in child.children:
-                    if isinstance(widget, BoxLayout):
-                        for text_field in widget.children:
-                            if isinstance(text_field, MDTextField):
-                                print(text_field.text)
-                                value_li.append(text_field.text)
+        # get the current sheet name
+        sheet = self.sheets[self.current_sheet_index]
+        if sheet in ['cover_page','first_page']:
+            for child in self.ids.container.children:
+                if isinstance(child, ScrollView):
+                    for widget in child.children:
+                        if isinstance(widget, BoxLayout):
+                            for text_field in widget.children:
+                                if isinstance(text_field, MDTextField):
+                                    print(text_field.text)
+                                    value_li.append(text_field.text)
+        elif self.sheets[self.current_sheet_index] in ['feedback_page']:
+            for child in self.ids.container.children:
+                if isinstance(child, ScrollView):
+                    for widget in child.children:
+                        if isinstance(widget, BoxLayout):
+                            for boxs in widget.children:
+                                for button in boxs.children:
+                                    if isinstance(button, MDRectangleFlatIconButton):
+                                        value_li.append(button.text)
+        elif self.sheets[self.current_sheet_index] in ['Image_page']:
+            # Check if the images folder exists
+            if not os.path.exists('resources/images'):
+                os.makedirs('resources/images')
+            print("values: ",self.values[1][1])
+            if not os.path.exists(f'resources/images/{self.values[1][1]}'):
+                os.makedirs(f'resources/images/{self.values[1][1]}')
+            for child in self.ids.container.children:
+                if isinstance(child, ScrollView):
+                    i=0
+                    self.newImage = SaveImage()
+                    for widget in child.children:
+                        if isinstance(widget, BoxLayout):
+                            for boxs in  widget.children:
+                                files=['Me','Family']
+                                for button in boxs.children:
+                                    if isinstance(button, MDRectangleFlatIconButton):
+                                            # print(i,button.text)
+                                            ext=button.text.split('.')[-1]
+                                            # print("ext: ",ext)
+                                            value_li.append(f'resources/images/{self.values[1][1]}/{files[i]}.{ext}')
+                                            self.newImage.addImage(i,button.text,f'resources/images/{self.values[1][1]}/{files[i]}.{ext}')
+                                            # print(files[i])
+                                            i+=1
+        else:
+            for child in self.ids.container.children:
+                if isinstance(child, ScrollView):
+                    for widget in child.children:
+                        if isinstance(widget, BoxLayout):
+                            for boxs in widget.children:
+                                for button in boxs.children:
+                                    if isinstance(button, MDRaisedButton):
+                                        if button.text == 'Term 1' or button.text == 'Term 2':
+                                            value_li.append("")
+                                        else:
+                                            value_li.append(button.text)
+        # print(value_li[::-1])
+
+        # Increment the current sheet index
+        self.current_sheet_index += 1
         self.values.append(value_li[::-1])
 
         # Clear the container
@@ -360,6 +641,10 @@ class EditScreen(Screen):
         if self.current_sheet_index < len(self.sheets):
             if self.sheets[self.current_sheet_index] in ['cover_page','first_page']:
                 self.create_text_fields(box_layout, self.current_sheet_index)
+            elif self.sheets[self.current_sheet_index] in ['Image_page']:
+                self.create_image_fields(box_layout, self.current_sheet_index)
+            elif self.sheets[self.current_sheet_index] in ['feedback_page']:
+                self.create_feedback_fields(box_layout, self.current_sheet_index)
             else:
                 self.create_button_fields(box_layout, self.current_sheet_index)
             self.ids.container.add_widget(Widget())
@@ -371,7 +656,6 @@ class EditScreen(Screen):
             self.ids.container.add_widget(Widget())
             self.ids.container.add_widget(MDLabel(text='Done', halign='center', theme_text_color='Primary'))
             self.ids.container.add_widget(Widget())
-            print(self.values)
             for sheet, value in zip(self.sheets, self.values):
                 worksheet = self.workbook[sheet]
             #      add values to the selected rows
@@ -380,6 +664,7 @@ class EditScreen(Screen):
             #     col=0
             #     for a in value:
             #         worksheet.cell(row=self.selected_row, column=col + 1, value=a)
+            self.newImage.save_image()
             self.workbook.save(f'resources/{self.workbook_active}')
 
 
@@ -525,12 +810,14 @@ class PrintScreen(Screen):
                     dic = d
                     break
         development_pages = [d["development_goal"] for d in dic['development_page']]
+        development_data = dic['development_page']
         # get the sheets in the workbook
         # start editing a pdf
         pdf = FPDF()
+        print(dic)
         sheets = [sheet.title for sheet in self.workbook.worksheets]
         for sheet_name in sheets:
-            if sheet_name in dic:
+            if sheet_name in {'cover_page', 'first_page'}:
                 sheet = self.workbook[sheet_name]
                 fields = dic[sheet_name]
                 attr = fields['report_fields']
@@ -571,7 +858,77 @@ class PrintScreen(Screen):
                         # add the image to the pdf
                         pdf.image('resources/' + sheet_name + '.jpg', x=field['position_x'], y=field['position_y'],
                                   w=field['width'], h=field['height'])
+            elif sheet_name == 'Image_page':
+                sheet = self.workbook[sheet_name]
+                fields = dic[sheet_name]
+                values = self.get_values_from_sheet(sheet,self.selected_row)
+                images=fields['images']
+                print(images)
+                new_url = url+fields["image"]
+                headers = {'Authorization': f'Token {get_stored_token()}'}
+                response = requests.get(new_url,  headers=headers)
+                image = response.content
+                with open('resources/image_background.jpg', 'wb') as f:
+                    f.write(image)
+                pdf.add_page()
+                pdf.image('resources/image_background.jpg', x=0, y=0, w=210, h=297)
+                for image in images:
+                    pdf.image(values[image['title']],x=image['x'],y=image['y'],w=image['width'],h=image['height'])
+                    print(values[image['title']])
+                pdf.set_font("helvetica", size=17)
+                print(fields)
+            elif sheet_name == 'feedback_page':
+                sheet = self.workbook[sheet_name]
+                fields = dic[sheet_name]
+                values = self.get_values_from_sheet(sheet, self.selected_row)
+                sections = fields['sections']
+                new_url = url+dic["default_background"]
+                headers = {'Authorization': f'Token {get_stored_token()}'}
+                response = requests.get(new_url,  headers=headers)
+                image = response.content
+                with open('resources/default_background.jpg', 'wb') as f:
+                    f.write(image)
+                pdf.add_page()
+                pdf.image('resources/default_background.jpg', x=0, y=0, w=210, h=297)
+                pdf.set_font("helvetica", size=22)
+                current_y=21
+                pdf.set_xy(21, current_y)
+                pdf.cell(170, 10, 'Feedback', align='C')
+                current_y+=17
+                for section in sections:
+                    pdf.set_font("helvetica", size=17)
+                    pdf.set_xy(21, current_y)
+                    pdf.cell(170, 12,section['name'], border=1, align='C')
+                    current_y+=12
+                    for field in section['Fields']:
+                        pdf.set_font("helvetica", size=17)
+                        pdf.set_xy(21, current_y)
+                        # Calculate the height of the cell for the field name
+                        name_no_of_cell= get_height(pdf,field['name'],80)
+                        # Calculate the height of the cell for the field value
+                        value_no_of_cell = get_height(pdf,values[field['name']],90)
+                        print(name_no_of_cell, value_no_of_cell)
+                        # Output the field name and value in multi_cell
+                        if name_no_of_cell<value_no_of_cell:
+                            cell_height = value_no_of_cell*10//name_no_of_cell
+                            pdf.multi_cell(80, cell_height, field['name'], border=1, align='C')
+                            pdf.set_xy(101, current_y)
+                            pdf.multi_cell(90, 10, values[field['name']], border=1, align='C')
+                            current_y+=value_no_of_cell*10
+                        else:
+                            cell_height = name_no_of_cell*10//value_no_of_cell
+                            pdf.multi_cell(80, 10, field['name'], border=1, align='C')
+                            pdf.set_xy(101, current_y)
+                            pdf.multi_cell(90, cell_height, values[field['name']], border=1, align='C')
+                            current_y+=name_no_of_cell*10
+                    current_y+=5
+
             elif sheet_name in development_pages:
+                # get the development page
+                sheet = self.workbook[sheet_name]
+                values = self.get_values_from_sheet_development(sheet, self.selected_row)
+                # print(values)
+                dev_page = development_data[development_pages.index(sheet_name)]
                 new_url = url+dic["default_background"]
                 headers = {'Authorization': f'Token {get_stored_token()}'}
                 response = requests.get(new_url,  headers=headers)
@@ -581,8 +938,56 @@ class PrintScreen(Screen):
                 pdf.add_page()
                 pdf.image('resources/default_background.jpg', x=0, y=0, w=210, h=297)
                 pdf.set_font("helvetica", size=17)
-                pdf.set_xy(0,0)
-                print('development page')
+                #create a table for the development page
+
+                pdf.set_xy(21, 21)
+                pdf.cell(170, 10, 'Development Goal:'+sheet_name, border=1, align='C')
+                pdf.set_xy(21, 31)
+                # multi cell for the key competencies and also get the number of cells that were added
+                pdf.multi_cell(170, 10, 'Key Competencies:'+dev_page['key_components'], border=1, align='C',ln=1)
+                # only set y position
+                pdf.set_xy(21, pdf.get_y())
+                pdf.cell(170/4, 20, '', border=1, align='C')
+                pdf.set_xy(21+170/4, pdf.get_y())
+                pdf.multi_cell(170/4, 10, 'Learning Outcome', border=1, align='C')
+                pdf.set_xy(21+170/2, pdf.get_y()-20)
+                pdf.cell(170/4, 20, 'Term 1', border=1, align='C')
+                pdf.set_xy(21+3*170/4, pdf.get_y())
+                pdf.cell(170/4, 20, 'Term 2', border=1, align='C')
+
+
+                # get no of rows in each section
+                section_rows_count = [ len(section['learning_outcome']) for section in dev_page['sections']]
+                # print(section_rows_count)
+                pdf.set_xy(21, pdf.get_y()+20)
+
+                #get  
+
+                # get the learning outcomes
+                for i,section in enumerate(dev_page['sections']):
+                    update_row_height = False
+                    y_pos=pdf.get_y()
+                    no_of_rows= get_height(pdf,section['name'],170/4)
+                    print(no_of_rows,section['name'],section_rows_count[i])
+                    height = 10 if no_of_rows>=section_rows_count[i] else 10*section_rows_count[i]/no_of_rows
+                    if no_of_rows>section_rows_count[i]:
+                        update_row_height = True
+                    pdf.multi_cell(170/4,height,section['name'].title(),border=1,align='C')
+                    pdf.set_xy(21+170/4, y_pos)
+                    for learning_outcome in section['learning_outcome']:
+                        height = no_of_rows*10/section_rows_count[i] if update_row_height else 10
+                        pdf.cell(170/4, height, learning_outcome['code'], border=1, align='C')
+                        pdf.set_xy(21+170/2, pdf.get_y())
+                        pdf.cell(170/4, height, "" if values[learning_outcome['code']]['term 1']==None else values[learning_outcome['code']]['term 1'], border=1, align='C')
+                        pdf.set_xy(21+3*170/4, pdf.get_y())
+                        pdf.cell(170/4, height, "" if values[learning_outcome['code']]['term 2']==None else values[learning_outcome['code']]['term 2'], border=1, align='C')
+                        pdf.set_xy(21+170/4, pdf.get_y()+height)
+                    
+                    pdf.set_xy(21, pdf.get_y())
+
+                # add border to the cell
+                
+
 
 
         pdf.output("resources/" + file_name + ".pdf")
@@ -595,9 +1000,36 @@ class PrintScreen(Screen):
             values[sheet.cell(1, col).value] = sheet.cell(selected_row, col).value
             col += 1
         return values
+    
+    def get_values_from_sheet_development(self, sheet, selected_row):
+        values = {}
+        col = 1
+        while col <= sheet.max_column:
+            header = sheet.cell(1, col).value
+            stripped_header = header[:-7]
+            if header.endswith('term 1'):
+                if stripped_header in values:
+                    values[stripped_header].update({'term 1': sheet.cell(selected_row, col).value})
+                else:
+                    values[stripped_header] = {'term 1': sheet.cell(selected_row, col).value}
+            elif header.endswith('term 2'):
+                if stripped_header in values:
+                    values[stripped_header].update({'term 2': sheet.cell(selected_row, col).value})
+                else:
+                    values[stripped_header] = {'term 2': sheet.cell(selected_row, col).value}
+            else:
+                values[stripped_header] = sheet.cell(selected_row, col).value
+            col += 1
+        return values
+
 
 
 class AddScreen(Screen):
+    def __init__(self, **kw):
+        super().__init__(**kw)
+        self.file_manager = ImageManager()
+        self.newImage=None
+
     def on_enter(self, *args):
         self.values = []
         self.ids.container.clear_widgets()
@@ -664,13 +1096,38 @@ class AddScreen(Screen):
             cell2 = row[i+1]
             if cell1.value and cell2.value:
                 common_text = get_common_text(cell1.value, cell2.value)
-                component = BoxLayout(orientation='horizontal', size_hint_y=None, height=dp(40))
+                component = BoxLayout(orientation='horizontal',size_hint=(None, None), size=(400, 60))
                 label = MDLabel(text=common_text)
-                button1 = MDRaisedButton(text='Term 1')
-                button2 = MDRaisedButton(text='Term 2')
+                button1 = MDRaisedButton(text='Term 1', on_press=lambda x: change_text_field(x),id=common_text+'1')
+                button2 = MDRaisedButton(text='Term 2',on_press=lambda x: change_text_field(x),id=common_text+'2')
                 component.add_widget(label)
                 component.add_widget(button1)
                 component.add_widget(button2)
+                box_layout.add_widget(component)
+
+        next_button = MDRaisedButton(text='Next', on_release=self.on_next_button_click, pos_hint={"center_x": 0.5})
+        box_layout.add_widget(next_button)
+
+    def create_feedback_fields(self, box_layout, sheet_index):
+        # Clear the BoxLayout
+        box_layout.clear_widgets()
+        self.ids.container.clear_widgets()
+        # Get the current sheet
+        sheet = self.sheets[sheet_index]
+        worksheet = self.workbook[sheet]
+
+        # Get the first row
+        row = worksheet[1]
+
+        # Create a button for each cell in the row
+        for i in range(0, len(row)):
+                component = BoxLayout(orientation='horizontal',size_hint=(None, None), size=(400, 60))
+                label = MDLabel(text=row[i].value)
+                # a button with dropdown arrow on the right
+
+                button1 = MDRectangleFlatIconButton(text="None",icon="menu-down", on_press=lambda x:self.show_confirmation_dialog(x),id=row[i].value)
+                component.add_widget(label)
+                component.add_widget(button1)
                 box_layout.add_widget(component)
 
         next_button = MDRaisedButton(text='Next', on_release=self.on_next_button_click, pos_hint={"center_x": 0.5})
@@ -697,18 +1154,141 @@ class AddScreen(Screen):
         next_button = MDRaisedButton(text='Next', on_release=self.on_next_button_click, pos_hint={"center_x": 0.5})
         box_layout.add_widget(next_button)
 
+
+    def show_confirmation_dialog(self,instance):
+        feedbacks_options=[]
+        # Add indentation here
+        # to fix the "Expected indented block" error
+        with open('scheme.json') as f:
+            data = json.load(f)
+            for d in data['classes']:
+                if d['name'] == self.workbook_active.split('.')[0]:
+                    data = d
+                    break
+            data=data['feedback_page']['sections']
+            for d in data:
+                for d1 in d['Fields']:
+                    if d1['name'] == instance.id:
+                        feedbacks_options = d1["options"]
+                        break
+
+        item=[ItemConfirm(text=i['choice']) for i in feedbacks_options]
+        item.append(ItemConfirm(text='Other'))
+        # print(feedbacks_options)
+        self.dialog = MDDialog(
+            title=instance.id,
+            # feedbacks=feedbacks,
+            type="confirmation",
+            items=item,
+            buttons=[
+                MDFlatButton(
+                    text="CANCEL",
+                    theme_text_color="Custom",
+                    on_release=self.close_dialog,
+                ),
+                MDFlatButton(
+                    text="OK",
+                    theme_text_color="Custom",
+                    on_release=lambda x:self.close_dialog(x, True,instance),
+                ),
+            ],
+        )
+        self.dialog.open()
+
+    def close_dialog(self, inst, update=False,instance=None):
+        if update:
+            val=[i.text for i in self.dialog.items if i.ids.check.active]
+            # updated the text of button that has colled the function
+            if len(val)>0:
+                instance.text=val[0]
+        self.dialog.dismiss()
+
+    def create_image_fields(self, box_layout, sheet_index):
+        # Clear the BoxLayout
+        box_layout.clear_widgets()
+        self.ids.container.clear_widgets()
+        # Get the current sheet
+        sheet = self.sheets[sheet_index]
+        worksheet = self.workbook[sheet]
+
+        # Get the first row
+        row = worksheet[1]
+        val = []
+
+        # Create a MDTextField for each cell in the row
+        for cell in row:
+            if cell.value:
+                component = BoxLayout(orientation='horizontal',size_hint=(None, None), size=(400, 60))
+                label = MDLabel(text=cell.value)
+                # a button with dropdown arrow on the right
+                button1 = MDRectangleFlatIconButton(text="None",icon="folder",id=cell.value)
+                button1.bind(on_press=lambda x,button1=button1:self.file_manager.file_manager_open(button1))
+                component.add_widget(label)
+                component.add_widget(button1)
+                box_layout.add_widget(component)
+
+        next_button = MDRaisedButton(text='Next', on_release=self.on_next_button_click, pos_hint={"center_x": 0.5})
+        box_layout.add_widget(next_button)
+
     def on_next_button_click(self, instance):
-        # Increment the current sheet index
-        self.current_sheet_index += 1
         # iterate throught the text fields and get the values
         value_li = []
-        for child in self.ids.container.children:
-            if isinstance(child, ScrollView):
-                for widget in child.children:
-                    if isinstance(widget, BoxLayout):
-                        for text_field in widget.children:
-                            if isinstance(text_field, MDTextField):
-                                value_li.append(text_field.text)
+        sheet = self.sheets[self.current_sheet_index]
+        if sheet in ['cover_page','first_page']:
+            for child in self.ids.container.children:
+                if isinstance(child, ScrollView):
+                    for widget in child.children:
+                        if isinstance(widget, BoxLayout):
+                            for text_field in widget.children:
+                                if isinstance(text_field, MDTextField):
+                                    print(text_field.text)
+                                    value_li.append(text_field.text)
+        elif self.sheets[self.current_sheet_index] in ['feedback_page']:
+            for child in self.ids.container.children:
+                if isinstance(child, ScrollView):
+                    for widget in child.children:
+                        if isinstance(widget, BoxLayout):
+                            for boxs in widget.children:
+                                for button in boxs.children:
+                                    if isinstance(button, MDRectangleFlatIconButton):
+                                        value_li.append(button.text)
+        elif self.sheets[self.current_sheet_index] in ['Image_page']:
+            # Check if the images folder exists
+            if not os.path.exists('resources/images'):
+                os.makedirs('resources/images')
+            if not os.path.exists(f'resources/images/{self.values[1][1]}'):
+                os.makedirs(f'resources/images/{self.values[1][1]}')
+            for child in self.ids.container.children:
+                if isinstance(child, ScrollView):
+                    i=0
+                    self.newImage = SaveImage()
+                    for widget in child.children:
+                        if isinstance(widget, BoxLayout):
+                            for boxs in  widget.children:
+                                files=['Me','Family']
+                                for button in boxs.children:
+                                    if isinstance(button, MDRectangleFlatIconButton):
+                                            # print(i,button.text)
+                                            ext=button.text.split('.')[-1]
+                                            # print("ext: ",ext)
+                                            value_li.append(f'resources/images/{self.values[1][1]}/{files[i]}.{ext}')
+                                            self.newImage.addImage(i,button.text,f'resources/images/{self.values[1][1]}/{files[i]}.{ext}')
+                                            # print(files[i])
+                                            i+=1
+        else:
+            for child in self.ids.container.children:
+                if isinstance(child, ScrollView):
+                    for widget in child.children:
+                        if isinstance(widget, BoxLayout):
+                            for boxs in widget.children:
+                                for button in boxs.children:
+                                    if isinstance(button, MDRaisedButton):
+                                        if button.text == 'Term 1' or button.text == 'Term 2':
+                                            value_li.append("")
+                                        else:
+                                            value_li.append(button.text)
+        
+        self.current_sheet_index += 1
         self.values.append(value_li[::-1])
 
         # Clear the container
@@ -724,6 +1304,10 @@ class AddScreen(Screen):
         if self.current_sheet_index < len(self.sheets):
             if self.sheets[self.current_sheet_index] in ['cover_page','first_page']:
                 self.create_text_fields(box_layout, self.current_sheet_index)
+            elif self.sheets[self.current_sheet_index] in ['Image_page']:
+                self.create_image_fields(box_layout, self.current_sheet_index)
+            elif self.sheets[self.current_sheet_index] in ['feedback_page']:
+                self.create_feedback_fields(box_layout, self.current_sheet_index)
             else:
                 self.create_button_fields(box_layout, self.current_sheet_index)
             self.ids.container.add_widget(Widget())
@@ -738,10 +1322,9 @@ class AddScreen(Screen):
             for sheet, value in zip(self.sheets, self.values):
                 worksheet = self.workbook[sheet]
                 worksheet.append(value)
+            self.newImage.save_image()
             self.workbook.save(f'resources/{self.workbook_active}')
 
-
-#             open the file and write the values
 
 
 class MainApp(MDApp):
@@ -780,6 +1363,47 @@ class MainApp(MDApp):
         if response.status_code == 200:
             self.sm.current = 'home'
         return self.sm
+    
+    def show_confirmation_dialog(self):
+        if not self.dialog:
+            self.dialog = MDDialog(
+                title="Phone ringtone",
+                type="confirmation",
+                items=[
+                    ItemConfirm(text="Callisto"),
+                    ItemConfirm(text="Luna"),
+                    ItemConfirm(text="Night"),
+                    ItemConfirm(text="Solo"),
+                    ItemConfirm(text="Phobos"),
+                    ItemConfirm(text="Diamond"),
+                    ItemConfirm(text="Sirena"),
+                    ItemConfirm(text="Red music"),
+                    ItemConfirm(text="Allergio"),
+                    ItemConfirm(text="Magic"),
+                    ItemConfirm(text="Tic-tac"),
+                    ItemConfirm(text="Other"),
+                ],
+                buttons=[
+                    MDFlatButton(
+                        text="CANCEL",
+                        theme_text_color="Custom",
+                        text_color=self.theme_cls.primary_color,
+                        on_release=self.close_dialog,
+                    ),
+                    MDFlatButton(
+                        text="OK",
+                        theme_text_color="Custom",
+                        text_color=self.theme_cls.primary_color,
+                        on_release=lambda x:self.close_dialog(x, True),
+                    ),
+                ],
+            )
+        self.dialog.open()
+
+    def close_dialog(self, inst, update=False):
+        if update:
+            print("Update", [i.text for i in self.dialog.items if i.ids.check.active])
+        self.dialog.dismiss()
 
     def on_login(self, username, password):
         # API endpoint
@@ -900,6 +1524,16 @@ def update_database(new_scheme):
     with open('scheme.json', 'w') as f:
         json.dump(new_scheme, f)
 
+def change_text_field(instance):
+    text_values = ['Beginner', 'Progressing', 'Proficient']
+    if instance.text in text_values:
+        index = text_values.index(instance.text)
+        if index == len(text_values) - 1:
+            instance.text = text_values[0]
+        else:
+            instance.text = text_values[index + 1]
+    else:
+        instance.text = text_values[0]
 
 def create_database():
     print("Creating the database")
@@ -915,7 +1549,7 @@ def create_database():
             else:
                 workbook = Workbook()
                 workbook.save(file_path)
-            values = ['cover_page', 'first_page','development_page']
+            values = ['cover_page', 'first_page','Image_page','development_page','feedback_page']
             for value in values:
                 if value in ['cover_page','first_page']:
                     worksheet = workbook[value] if value in workbook else None
@@ -942,7 +1576,35 @@ def create_database():
                                 worksheet.cell(row=1, column=i + 1, value=l['code']+" term 1")
                                 worksheet.cell(row=1, column=i+2, value=l['code']+" term 2")
                                 i += 2
+                elif value=='feedback_page':
+                    sub=cls[value]["sections"]
+                    print(sub)
+                    worksheet = workbook[value] if value in workbook else None
+                    if worksheet is None:
+                        worksheet = workbook.create_sheet(value)
+                    i=0
+                    for s in sub:
+                        sub_li=s["Fields"]
+                        print(sub_li)
+                        for l in sub_li:
+                            print(l['name'])
+                            worksheet.cell(row=1, column=i + 1, value=l['name'])
+                            i += 1
+                elif value=='Image_page':
+                    sub=cls[value]["images"]
+                    worksheet = workbook[value] if value in workbook else None
+                    if worksheet is None:
+                        worksheet = workbook.create_sheet(value)
+                    # worksheet.cell(row=1, column=1, value='Image')
+                    for i in range(len(sub)):
+                        worksheet.cell(row=1, column=i + 1, value=sub[i]['title'])
             workbook.save(file_path)
 
+# gets the height of the string in pdf
+def get_height(pdf, text, width):
+    word_length = pdf.get_string_width(text+"m")
+    lines = math.ceil(word_length / width)
+    # print(word_length,text, lines)
+    return lines
 
 MainApp().run()

@@ -1,52 +1,92 @@
+import os
+
+from kivy.core.window import Window
 from kivy.lang import Builder
-from kivy.uix.boxlayout import BoxLayout
-from kivy.uix.scrollview import ScrollView
-from kivy.uix.label import Label
-from kivy.uix.button import Button
+
 from kivymd.app import MDApp
+from kivymd.uix.filemanager import MDFileManager
+from kivymd.toast import toast
 
-# Load the KivyMD design language string
-kv_string = '''
-<RootLayout>:
-    ScrollView:
-        BoxLayout:
-            orientation: 'vertical'
-            size_hint_y: None
-            height: self.minimum_height
-            
-            BoxLayout:
-                orientation: 'horizontal'
-                size_hint_y: None
-                height: dp(40)  # Adjust the height as needed
 
-                Label:
-                    text: "Group 1 Label 1"
-                Button:
-                    text: "Button 1"
-                Button:
-                    text: "Button 2"
-            
-            BoxLayout:
-                orientation: 'horizontal'
-                size_hint_y: None
-                height: dp(40)  # Adjust the height as needed
+KV = '''
+MDBoxLayout:
+    orientation: "vertical"
 
-                Label:
-                    text: "Group 2 Label 1"
-                Button:
-                    text: "Button 3"
-                Button:
-                    text: "Button 4"
+    MDTopAppBar:
+        title: "MDFileManager"
+        left_action_items: [["menu", lambda x: None]]
+        elevation: 3
 
-            # Add more BoxLayouts for additional groups as needed
+    MDFloatLayout:
+
+        MDRoundFlatIconButton:
+            text: "Open manager"
+            icon: "folder"
+            pos_hint: {"center_x": .5, "center_y": .5}
+            on_release: app.file_manager.file_manager_open()
 '''
 
-class RootLayout(BoxLayout):
-    pass
+class CustomFileManager(MDFileManager):
+    def show(self, path):
+        '''Forms the body of a directory. Called when opening a directory.'''
 
-class MyApp(MDApp):
+        self.current_path = path
+        super().show(path)
+        self.selection_button.opacity = 0  # hide the selection_button
+        self.selection_button.disabled = True 
+
+class ImageManager():
+    def __init__(self):
+        Window.bind(on_keyboard=self.events)
+        self.manager_open = False
+        self.file_manager = CustomFileManager(
+            exit_manager=self.exit_manager, 
+            select_path=self.select_path,
+            ext=['.jpg', '.png', '.jpeg'],# only show these types of files
+            preview=True, # allow preview of images
+            icon_selection_button="none",
+        )
+
+    def file_manager_open(self):
+        self.file_manager.show(os.path.expanduser("~"))  # output manager to the screen
+        self.manager_open = True
+
+    def select_path(self, path: str):
+        '''
+        It will be called when you click on the file name
+        or the catalog selection button.
+
+        :param path: path to the selected directory or file;
+        '''
+        self.exit_manager()
+        toast(path)
+
+    def exit_manager(self, *args):
+        '''Called when the user reaches the root of the directory tree.'''
+
+        self.manager_open = False
+        self.file_manager.close()
+
+    def events(self, instance, keyboard, keycode, text, modifiers):
+        '''Called when buttons are pressed on the mobile device.'''
+
+        if keyboard in (1001, 27):
+            if self.manager_open:
+                self.file_manager.back()
+        return True
+
+class Example(MDApp):
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+        self.manager_open = False
+        self.file_manager = ImageManager()
+
     def build(self):
-        return RootLayout()
+        self.theme_cls.theme_style = "Dark"
+        self.theme_cls.primary_palette = "Orange"
+        return Builder.load_string(KV)
 
-if __name__ == "__main__":
-    MyApp().run()
+
+
+Example().run()
+
