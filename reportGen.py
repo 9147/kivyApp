@@ -1,6 +1,7 @@
 import math
 import os
 import shutil
+import threading
 from kivy.lang import Builder
 from kivy.metrics import dp
 from kivy.core.window import Window
@@ -19,7 +20,6 @@ from kivymd.uix.button import MDFlatButton
 from kivymd.uix.button import MDRectangleFlatIconButton
 from kivymd.uix.textfield import MDTextField
 from kivymd.uix.list import OneLineAvatarIconListItem
-from kivymd.uix.list import IconRightWidget
 import glob
 import requests
 from kivymd.uix.filemanager import MDFileManager
@@ -29,9 +29,13 @@ from openpyxl.workbook import Workbook
 from kivy.uix.scrollview import ScrollView
 from kivymd.uix.textfield import MDTextField
 from fpdf import FPDF
-import os
+import netifaces
+from kivy.clock import Clock
 
-url = "http://127.0.0.1:8000/"
+
+
+# url = "https://0000manoj0000.pythonanywhere.com/"
+url = 'http://127.0.0.1:8000/'
 
 Builder.load_string('''
 #:import toast kivymd.toast.toast
@@ -171,6 +175,35 @@ Builder.load_string('''
 
 ''')
 
+def get_global_ipv6_address():
+    interfaces = netifaces.interfaces()
+    for interface in interfaces:
+        addresses = netifaces.ifaddresses(interface)
+        if netifaces.AF_INET6 in addresses:
+            for addr in addresses[netifaces.AF_INET6]:
+                ipv6_addr = addr['addr']
+                # Check for a global unicast address (not starting with fe80:: or fd00::/8)
+                if ipv6_addr and not ipv6_addr.startswith('fe80') and not ipv6_addr.startswith('fd'):
+                    return ipv6_addr.split('%')[0]  # Remove the zone index if present
+    return None
+
+
+def ImLive(dt):
+    headers = {'Authorization': f'Token {get_stored_token()}'}
+    if headers['Authorization']=="":
+        toast("Your session has expired")
+        MainApp().logout()
+    new_url = url + 'live/'
+    data={'request':'live','ipv6':get_global_ipv6_address()}
+    # print(data)
+    try:
+        response = requests.post(new_url, headers=headers,data=data)
+        if not response.status_code == 200:
+            toast("Connection lost!!")
+    except requests.exceptions.RequestException as e:
+        toast("Server connection error")
+    print("I'm live!")
+
 class CustomFileManager(MDFileManager):
     def show(self, path):
         '''Forms the body of a directory. Called when opening a directory.'''
@@ -239,10 +272,10 @@ class SaveImage:
             self.FamilyImage = [from_path, to_path]
 
     def save_image(self):
-        shutil.copy(self.MeImage[0], self.MeImage[1])
-        shutil.copy(self.FamilyImage[0], self.FamilyImage[1])
-
-
+        if self.MeImage[0]!=self.MeImage[1]:
+            shutil.copy(self.MeImage[0], self.MeImage[1])
+        if self.FamilyImage[0]!=self.FamilyImage[1]:
+            shutil.copy(self.FamilyImage[0], self.FamilyImage[1])
 
 
 class ItemConfirm(OneLineAvatarIconListItem):
@@ -308,6 +341,10 @@ class EditScreen(Screen):
         self.dialog = None
         self.current_sheet_index = 0
         self.values = []
+        self.development_page_count = 0
+        global url
+        self.url = url
+        self.section_no=""
 
     def on_enter(self, *args):
         self.values = []
@@ -354,8 +391,10 @@ class EditScreen(Screen):
                 text_field = widget
                 break
         admissionNo = text_field.text
+        self.admission_number=str(admissionNo).strip()
         if admissionNo:
             sheet = self.workbook['cover_page']
+            
     #         in first row find the cell with value admission number
             for cell in sheet[1]:
                 if cell.value == 'Admission Number':
@@ -397,6 +436,7 @@ class EditScreen(Screen):
 
         # Create MDTextField for each cell in the first row of the first sheet
         self.create_text_fields(box_layout, self.current_sheet_index)
+        self.development_page_count = 0
 
         # Add the ScrollView to the container
         self.ids.container.add_widget(Widget())
@@ -484,7 +524,10 @@ class EditScreen(Screen):
         # Create a MDTextField for each cell in the row
         for cell in row:
             if cell.value:
-                text_field = MDTextField(hint_text=str(cell.value), text=str(worksheet.cell(row=self.selected_row, column=cell.column).value) if worksheet.cell(row=self.selected_row, column=cell.column).value else "")
+                if cell.value.strip()=='Admission Number':
+                    text_field = MDTextField(hint_text=str(cell.value), text=str(worksheet.cell(row=self.selected_row, column=cell.column).value) if worksheet.cell(row=self.selected_row, column=cell.column).value else "",readonly=True )
+                else:
+                    text_field = MDTextField(hint_text=str(cell.value), text=str(worksheet.cell(row=self.selected_row, column=cell.column).value) if worksheet.cell(row=self.selected_row, column=cell.column).value else "")
                 box_layout.add_widget(text_field)
 
         next_button = MDRaisedButton(text='Next', on_release=self.on_next_button_click, pos_hint={"center_x": 0.5})
@@ -637,19 +680,55 @@ class EditScreen(Screen):
         box_layout.bind(minimum_height=box_layout.setter('height'))
         scroll_view.add_widget(box_layout)
 
+        click_next_button = False
+
         # If there are more sheets, create text fields for the next sheet
         if self.current_sheet_index < len(self.sheets):
+            with open('scheme.json') as f:
+                data = json.load(f)
+                for d in data['classes']:
+                    if d['name'] == self.workbook_active.split('.')[0]:
+                        data = d
+                        break
+                else:
+                    # notify that there was an error and returm to the main screen
+                    toast('An error occured please contact the developer! This is related to your access to this section')
+                    self.manager.current = 'home'
+            # access_accounts=data[self.sheets[self.current_sheet_index]+"_access"]
+            # print("access accounts",access_accounts)
             if self.sheets[self.current_sheet_index] in ['cover_page','first_page']:
+                access_accounts=data[self.sheets[self.current_sheet_index]+"_access"]
                 self.create_text_fields(box_layout, self.current_sheet_index)
+                # get dict from scheme.json
+                # if access_accounts
+                if not (access_accounts['username']==get_username() or get_username() == 'admin'):
+                    click_next_button = True
+                else:
+                    self.section_no+=','+str(self.current_sheet_index)
             elif self.sheets[self.current_sheet_index] in ['Image_page']:
+                access_accounts=data[self.sheets[self.current_sheet_index]+"_access"]
                 self.create_image_fields(box_layout, self.current_sheet_index)
+                if not (access_accounts['username']==get_username() or get_username() == 'admin'):
+                    click_next_button=True
+                else:
+                    self.section_no+=','+str(self.current_sheet_index)
             elif self.sheets[self.current_sheet_index] in ['feedback_page']:
+                self.section_no+=','+str(self.current_sheet_index)
                 self.create_feedback_fields(box_layout, self.current_sheet_index)
             else:
                 self.create_button_fields(box_layout, self.current_sheet_index)
+                access_accounts=[dic['username'] for dic in data['development_page_access'][self.development_page_count]['Auth_teachers_access']]
+                # print("access accounts",access_accounts)
+                self.development_page_count += 1
+                if not (get_username() in access_accounts or get_username() == 'admin'):
+                    click_next_button=True
+                else:
+                    self.section_no+=','+str(self.current_sheet_index)
             self.ids.container.add_widget(Widget())
             self.ids.container.add_widget(scroll_view)
             self.ids.container.add_widget(Widget())
+            if click_next_button:
+                self.on_next_button_click(instance)
         else:
             #             display its done and add a home button
             self.ids.container.clear_widgets()
@@ -664,8 +743,22 @@ class EditScreen(Screen):
             #     col=0
             #     for a in value:
             #         worksheet.cell(row=self.selected_row, column=col + 1, value=a)
-            self.newImage.save_image()
+            if self.newImage or self.newImage=='None':
+                self.newImage.save_image()
             self.workbook.save(f'resources/{self.workbook_active}')
+            url = self.url + "update/"
+            print("value:",self.values[1])
+            data = {"request": "update","section_no":self.section_no,'admission_no':self.values[1][1],'class_name':self.workbook_active.split('.')[0]}
+            headers = {'Authorization': f'Token {get_stored_token()}'}
+            response = requests.post(url, headers=headers, data=data)
+            if response.status_code == 200:
+                toast('Server notified successfully\n Your commit number is: '+str(response.json()['commit_no']))
+                print(response.json()['devices'])
+            else:
+                # create a file named notification.txt
+                with open('notification.txt', 'a') as f:
+                    f.write(self.section_no+':'+self.values[1][1]+":"+self.workbook_active.split('.')[0])
+                toast('An error occured while notifying the server')
 
 
 class PrintScreen(Screen):
@@ -1029,11 +1122,17 @@ class AddScreen(Screen):
         super().__init__(**kw)
         self.file_manager = ImageManager()
         self.newImage=None
+        self.development_page_count = 0
 
     def on_enter(self, *args):
         self.values = []
+        global url
+        self.url = url
+        self.development_page_count = 0
         self.ids.container.clear_widgets()
         self.get_xlsx_files()
+
+        
 
     def get_xlsx_files(self):
         files = glob.glob('resources/*.xlsx')
@@ -1062,6 +1161,21 @@ class AddScreen(Screen):
         # open the file name instance.text
         self.workbook_active = instance.text
         workbook = load_workbook(filename=f'resources/{instance.text}')
+
+        # check if the user has access to create content from the file
+        with open('scheme.json') as f:
+            data = json.load(f)
+            for d in data['classes']:
+                if d['name'] == self.workbook_active.split('.')[0]:
+                    data = d
+                    break
+            # print("data",data["cover_page_access"])
+            if not (data["cover_page_access"]['username']==get_username() or get_username() == 'admin'):
+                toast('You do not have access to this section')
+                # close add screen
+                self.manager.current = 'home'
+
+                
         # get the first sheet
         sheets = [sheet.title for sheet in workbook.worksheets]
 
@@ -1072,6 +1186,7 @@ class AddScreen(Screen):
 
         # Create MDTextField for each cell in the first row of the first sheet
         self.create_text_fields(box_layout, self.current_sheet_index)
+        
 
         # Add the ScrollView to the container
         self.ids.container.add_widget(Widget())
@@ -1148,7 +1263,7 @@ class AddScreen(Screen):
         # Create a MDTextField for each cell in the row
         for cell in row:
             if cell.value:
-                text_field = MDTextField(hint_text=str(cell.value))
+                text_field = MDTextField(hint_text=str(cell.value),id=str(cell.value).strip().replace(' ',"").lower())
                 box_layout.add_widget(text_field)
 
         next_button = MDRaisedButton(text='Next', on_release=self.on_next_button_click, pos_hint={"center_x": 0.5})
@@ -1230,6 +1345,26 @@ class AddScreen(Screen):
         next_button = MDRaisedButton(text='Next', on_release=self.on_next_button_click, pos_hint={"center_x": 0.5})
         box_layout.add_widget(next_button)
 
+    def get_admission_number_column(self, sheet):
+        """
+        Finds the column index containing "Admission Number" in the sheet's first row.
+
+        Args:
+            sheet: The sheet object from your workbook.
+
+        Returns:
+            The column index (integer) containing "Admission Number" or None if not found.
+        """
+        # Get the first row
+        first_row = [cell.value for cell in sheet[1]]
+        # print(first_row)
+        # Find the index of the cell containing "Admission Number" (case-insensitive)
+        for col_index, cell in enumerate(first_row):
+            if cell and cell.lower() == "admission number":
+                return col_index
+
+        return None
+
     def on_next_button_click(self, instance):
         # iterate throught the text fields and get the values
         value_li = []
@@ -1242,6 +1377,18 @@ class AddScreen(Screen):
                             for text_field in widget.children:
                                 if isinstance(text_field, MDTextField):
                                     print(text_field.text)
+                                    if text_field.hint_text.strip()=='Admission Number':
+                                        admission_number_column=self.get_admission_number_column(self.workbook[sheet])
+                                        # print("admission number col: ",admission_number_column)
+                                        if admission_number_column is not None:
+                                            column = [ value[admission_number_column]  for value in self.workbook[sheet]]
+                                            print("column: ",column)
+                                            # skip the first row
+                                            for cell in column[1:]:
+                                                if cell.value == text_field.text.strip():
+                                                    toast('Admission Number already exists')
+                                                    self.values = []
+                                                    return 
                                     value_li.append(text_field.text)
         elif self.sheets[self.current_sheet_index] in ['feedback_page']:
             for child in self.ids.container.children:
@@ -1300,19 +1447,47 @@ class AddScreen(Screen):
         box_layout.bind(minimum_height=box_layout.setter('height'))
         scroll_view.add_widget(box_layout)
 
+        click_next_button=False
+
         # If there are more sheets, create text fields for the next sheet
         if self.current_sheet_index < len(self.sheets):
+            with open('scheme.json') as f:
+                data = json.load(f)
+                for d in data['classes']:
+                    if d['name'] == self.workbook_active.split('.')[0]:
+                        data = d
+                        break
+                else:
+                    # notify that there was an error and returm to the main screen
+                    toast('An error occured please contact the developer! This is related to your access to this section')
+                    self.manager.current = 'home'
             if self.sheets[self.current_sheet_index] in ['cover_page','first_page']:
+                access_accounts=data[self.sheets[self.current_sheet_index]+"_access"]
                 self.create_text_fields(box_layout, self.current_sheet_index)
+                # wait until the above call has completed
+                if not (access_accounts['username']==get_username() or get_username() == 'admin'):
+                    click_next_button=True
+                print("access accounts",access_accounts)
             elif self.sheets[self.current_sheet_index] in ['Image_page']:
-                self.create_image_fields(box_layout, self.current_sheet_index)
+                access_accounts=data[self.sheets[self.current_sheet_index]+"_access"]
+                # print("access accounts",access_accounts)
+                self.create_image_fields(box_layout, self.current_sheet_index)  
+                if not (access_accounts['username']==get_username() or get_username() == 'admin'):
+                    click_next_button=True
             elif self.sheets[self.current_sheet_index] in ['feedback_page']:
                 self.create_feedback_fields(box_layout, self.current_sheet_index)
             else:
                 self.create_button_fields(box_layout, self.current_sheet_index)
+                access_accounts=[dic['username'] for dic in data['development_page_access'][self.development_page_count]['Auth_teachers_access']]
+                print("access accounts",access_accounts)
+                self.development_page_count += 1
+                if not (get_username() in access_accounts or get_username() == 'admin'):
+                    click_next_button=True
             self.ids.container.add_widget(Widget())
             self.ids.container.add_widget(scroll_view)
             self.ids.container.add_widget(Widget())
+            if click_next_button:
+                self.on_next_button_click(instance)
         else:
             #display its done and add a home button
             self.ids.container.clear_widgets()
@@ -1322,8 +1497,22 @@ class AddScreen(Screen):
             for sheet, value in zip(self.sheets, self.values):
                 worksheet = self.workbook[sheet]
                 worksheet.append(value)
-            self.newImage.save_image()
+            if self.newImage or self.newImage=='None':
+                self.newImage.save_image()
             self.workbook.save(f'resources/{self.workbook_active}')
+            url = self.url + "update/"
+            print("value:",self.values[1])
+            data = {"request": "update","section_no":'all','admission_no':self.values[1][1],'class_name':self.workbook_active.split('.')[0]}
+            headers = {'Authorization': f'Token {get_stored_token()}'}
+            response = requests.post(url, headers=headers, data=data)
+            if response.status_code == 200:
+                toast('Server notified successfully\n Your commit number is: '+str(response.json()['commit_no']))
+                print(response.json()['devices'])
+            else:
+                # create a file named notification.txt
+                with open('notification.txt', 'a') as f:
+                    f.write('all:'+self.values[1][1]+":"+self.workbook_active.split('.')[0])
+                toast('An error occured while notifying the server')
 
 
 
@@ -1414,6 +1603,9 @@ class MainApp(MDApp):
         # Send a post request to the API
         response = requests.post(url, data=data)
         if response.status_code == 200:
+            # create a file make user.json and store the username
+            with open('user.json', 'w') as f:
+                json.dump({'username': username}, f)
             # Assuming the token is returned in the response JSON
             response_json = response.json()
             new_token = response_json.get('token')
@@ -1467,6 +1659,11 @@ class MainApp(MDApp):
 
     def go_home(self):
         self.sm.current = 'home'
+
+    def on_start(self):
+        ImLive(0)  # call ImLive once to start the schedule
+        Clock.schedule_interval(ImLive, 150)  # schedule ImLive to be called every 30 seconds
+        return super().on_start()
 
 
 def store_token(token):
@@ -1606,5 +1803,13 @@ def get_height(pdf, text, width):
     lines = math.ceil(word_length / width)
     # print(word_length,text, lines)
     return lines
+
+def get_username():
+    with open('user.json', 'r') as f:
+        data = json.load(f)
+        return data.get('username')
+
+
+
 
 MainApp().run()

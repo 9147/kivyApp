@@ -1,43 +1,40 @@
-from kivymd.app import MDApp
-from kivy.factory import Factory
-from kivy.lang import Builder
+import socket
+import netifaces
 
-from kivymd.theming import ThemeManager
+def get_global_ipv6_address():
+    interfaces = netifaces.interfaces()
+    for interface in interfaces:
+        addresses = netifaces.ifaddresses(interface)
+        if netifaces.AF_INET6 in addresses:
+            for addr in addresses[netifaces.AF_INET6]:
+                ipv6_addr = addr['addr']
+                # Check for a global unicast address (not starting with fe80:: or fd00::/8)
+                if ipv6_addr and not ipv6_addr.startswith('fe80') and not ipv6_addr.startswith('fd'):
+                    return ipv6_addr.split('%')[0]  # Remove the zone index if present
+    return None
 
-Builder.load_string(
-    '''
-#:import toast kivymd.toast.toast
+def start_server(ipv6_address, port):
+    server_socket = socket.socket(socket.AF_INET6, socket.SOCK_STREAM)
+    server_socket.bind((ipv6_address, port, 0, 0))
+    server_socket.listen(1)
+    print(f"Server listening on [{ipv6_address}]:{port}")
+    
+    conn, addr = server_socket.accept()
+    print(f"Connected by {addr}")
+    
+    data = conn.recv(1024)
+    print("Received:", data.decode())
+    
+    response = "Hello from the server!"
+    conn.sendall(response.encode())
+    
+    conn.close()
+    server_socket.close()
 
-
-<MyRoot@BoxLayout>
-    orientation: 'vertical'
-
-    MDTopAppBar
-        title: "Test MDDropDownItem"
-        md_bg_color: app.theme_cls.primary_color
-        elevation: 10
-        left_action_items: [['menu', lambda x: x]]
-
-    FloatLayout:
-
-        MDDropDownItem:
-            id: dropdown_item
-            pos_hint: {'center_x': 0.5, 'center_y': 0.6}
-            items: app.items
-            dropdown_bg: [1, 1, 1, 1]
-
-        MDRaisedButton:
-            pos_hint: {'center_x': 0.5, 'center_y': 0.3}
-            text: 'Chek Item'
-            on_release: toast(dropdown_item.current_item)
-''')
-
-
-class Test(MDApp):
-
-    def build(self):
-        self.items = [f"Item {i}" for i in range(50)]
-        return Factory.MyRoot()
-
-
-Test().run()
+if __name__ == "__main__":
+    ipv6_address = get_global_ipv6_address()
+    if ipv6_address:
+        port = 1680
+        start_server(ipv6_address, port)
+    else:
+        print("No global IPv6 address found.")
