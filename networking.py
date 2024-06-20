@@ -39,7 +39,7 @@ def start_server(ipv6_address, port, stop_event):
         message = received_data.get("message")
         print("Message:", message)
         if message=='Initiating commit push':
-            wb = load_workbook("resource/"+received_data.get('class_name')+'.xlsx')
+            wb = load_workbook("resources/"+received_data.get('class_name')+'.xlsx')
             sheets = [sheet.title for sheet in wb.worksheets]
             section_no=received_data.get('section_no').strip(',')
             section_no=list(map(int,section_no.split(',')))
