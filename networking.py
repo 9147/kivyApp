@@ -58,40 +58,8 @@ def connect_to_server(ipv6_address, port,message_dict):
     client_socket.sendall(message.encode('utf-8'))
 
     data = client_socket.recv(1024)
-    received_data=json.loads(data.decode('utf-8'))
-    if received_data.get("message")=="Commit push initiated":
-        # open the xlsx file
-        wb = load_workbook("resource/"+received_data.get('class_name')+'.xlsx')
-        sheets = [sheet.title for sheet in wb.worksheets]
-        section_no=received_data.get('section_no').strip(',')
-        section_no=list(map(int,section_no.split(',')))
-        admission_no=received_data.get('admission_no')
-        sheet=wb['cover_page']
-        #in first row find the cell with value admission number
-        match=False
-        for cell in sheet[1]:
-            if cell.value == 'Admission Number':
-                row:int=2
-                while row <= sheet.max_row:
-                    if str(sheet.cell(row=row, column=cell.column).value).strip() == str(admission_no).strip():
-                        match=True
-                        selected_row = row
-                    row += 1
-        result= {}
-        if match:
-            for section in section_no:
-                result[str(row)]=str(wb[sheets[section]][row]).strip()
-            print("results:",result)
-            response = {"message":"Data","result":result}
-            message = json.dumps(response)
-            client_socket.sendall(message.encode('utf-8'))
-        else:
-            print("Admission number not found")
-
-
-        print("Received from server:", received_data)   
+    received_data=json.loads(data.decode('utf-8'))  
     print("Received from server:", received_data)
-
     client_socket.close()
 
 def generate_code():

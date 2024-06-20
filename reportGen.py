@@ -748,7 +748,27 @@ class EditScreen(Screen):
                     # check that device ip is not loop back ip
                     ip_address=get_global_ipv6_address()
                     if not device['device_ip'].startswith('fe80') and not device['device_ip'].startswith('fd') and device['device_ip'] != '::1' and device['device_ip'] != ip_address:
-                        connect_to_server(device['device_ip'],1680,{"message":"Initiating commit push","commit_no":str(response.json()['commit_no']),"admission_no":self.values[1][1],"class_name":self.workbook_active.split('.')[0],"section_no":self.section_no})
+                        sheets = [sheet.title for sheet in self.workbook.worksheets]
+                        section_no=self.section_no
+                        section_no=list(map(int,section_no.split(',')))
+                        admission_no=self.values[1][1]
+                        sheet=self.workbook['cover_page']
+                        #in first row find the cell with value admission number
+                        match=False
+                        for cell in sheet[1]:
+                            if cell.value == 'Admission Number':
+                                row:int=2
+                                while row <= sheet.max_row:
+                                    if str(sheet.cell(row=row, column=cell.column).value).strip() == str(admission_no).strip():
+                                        match=True
+                                        selected_row = row
+                                    row += 1
+                        result= {}
+                        if match:
+                            for section in section_no:
+                                result[section]=str(self.workbook[sheets[section]][row].value).strip()
+                            print("results:",result)
+                        connect_to_server(device['device_ip'],1680,{"message":"Initiating commit push","commit_no":str(response.json()['commit_no']),"admission_no":self.values[1][1],"class_name":self.workbook_active.split('.')[0],"section_no":self.section_no,"results":result})
             else:
                 # create a file named notification.txt
                 with open('notification.txt', 'a') as f:
