@@ -13,23 +13,40 @@ def get_global_ipv6_address():
                     return ipv6_addr.split('%')[0]  # Remove the zone index if present
     return None
 
-def start_server(ipv6_address, port):
+def start_server(ipv6_address, port, stop_event):
     server_socket = socket.socket(socket.AF_INET6, socket.SOCK_STREAM)
     server_socket.bind((ipv6_address, port, 0, 0))
     server_socket.listen(1)
+    server_socket.settimeout(1)  # set a timeout of 1 second
     print(f"Server listening on [{ipv6_address}]:{port}")
+    while not stop_event.is_set():
+        try:
+            conn, addr = server_socket.accept()
+        except socket.timeout:
+            continue  # if a timeout occurs, continue the loop to check the stop_event
+        print(f"Connected by {addr}")
     
-    conn, addr = server_socket.accept()
-    print(f"Connected by {addr}")
+        data = conn.recv(1024)
+        print("Received:", data.decode())
     
-    data = conn.recv(1024)
-    print("Received:", data.decode())
-    
-    response = "Hello from the server!"
-    conn.sendall(response.encode())
-    
-    conn.close()
+        response = "Hello from the server!"
+        conn.sendall(response.encode())
+        conn.close()
     server_socket.close()
+
+def connect_to_server(ipv6_address, port):
+    client_socket = socket.socket(socket.AF_INET6, socket.SOCK_STREAM)
+    client_socket.connect((ipv6_address, port, 0, 0))
+    print(f"Connected to server at [{ipv6_address}]:{port}")
+
+    message = "Hello from the client!"
+    client_socket.sendall(message.encode())
+
+    data = client_socket.recv(1024)
+    print("Received from server:", data.decode())
+
+    client_socket.close()
+
 
 if __name__ == "__main__":
     ipv6_address = get_global_ipv6_address()

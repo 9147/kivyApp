@@ -29,13 +29,13 @@ from openpyxl.workbook import Workbook
 from kivy.uix.scrollview import ScrollView
 from kivymd.uix.textfield import MDTextField
 from fpdf import FPDF
-import netifaces
+from networking import get_global_ipv6_address, start_server, connect_to_server
 from kivy.clock import Clock
 
 
 
-# url = "https://0000manoj0000.pythonanywhere.com/"
-url = 'http://127.0.0.1:8000/'
+url = "https://0000manoj0000.pythonanywhere.com/"
+# url = 'http://127.0.0.1:8000/'
 
 Builder.load_string('''
 #:import toast kivymd.toast.toast
@@ -175,17 +175,7 @@ Builder.load_string('''
 
 ''')
 
-def get_global_ipv6_address():
-    interfaces = netifaces.interfaces()
-    for interface in interfaces:
-        addresses = netifaces.ifaddresses(interface)
-        if netifaces.AF_INET6 in addresses:
-            for addr in addresses[netifaces.AF_INET6]:
-                ipv6_addr = addr['addr']
-                # Check for a global unicast address (not starting with fe80:: or fd00::/8)
-                if ipv6_addr and not ipv6_addr.startswith('fe80') and not ipv6_addr.startswith('fd'):
-                    return ipv6_addr.split('%')[0]  # Remove the zone index if present
-    return None
+
 
 
 def ImLive(dt):
@@ -754,6 +744,11 @@ class EditScreen(Screen):
             if response.status_code == 200:
                 toast('Server notified successfully\n Your commit number is: '+str(response.json()['commit_no']))
                 print(response.json()['devices'])
+                for device in response.json()['devices']:
+                    # check that device ip is not loop back ip
+                    ip_address=get_global_ipv6_address()
+                    if not device['device_ip'].startswith('fe80') and not device['device_ip'].startswith('fd') and device['device_ip'] != '::1' and device['device_ip'] != ip_address:
+                        connect_to_server(device['device_ip'],"hello this is me!!! "+str(response.json()['commit_no']))
             else:
                 # create a file named notification.txt
                 with open('notification.txt', 'a') as f:
@@ -1551,6 +1546,9 @@ class MainApp(MDApp):
         # response = requests.post(url, data=data, cookies=cookies)
         if response.status_code == 200:
             self.sm.current = 'home'
+        self.stop_event = threading.Event()
+        server_thread = threading.Thread(target=start_server, args=(get_global_ipv6_address(), 1680, self.stop_event))
+        server_thread.start()
         return self.sm
     
     def show_confirmation_dialog(self):
@@ -1664,6 +1662,9 @@ class MainApp(MDApp):
         ImLive(0)  # call ImLive once to start the schedule
         Clock.schedule_interval(ImLive, 150)  # schedule ImLive to be called every 30 seconds
         return super().on_start()
+    
+    def on_stop(self):
+        self.stop_event.set()
 
 
 def store_token(token):
@@ -1713,6 +1714,8 @@ def get_data_scheme():
             create_database()
     else:
         print("Failed to get the scheme")
+
+    
 
 
 
@@ -1808,8 +1811,5 @@ def get_username():
     with open('user.json', 'r') as f:
         data = json.load(f)
         return data.get('username')
-
-
-
-
+    
 MainApp().run()
