@@ -46,9 +46,10 @@ def connect_to_server(ipv6_address, port,message):
 
 
 if __name__ == "__main__":
-    ipv6_address = get_global_ipv6_address()
+    ipv6_address = '2401:4900:4e76:1858:a2cc:7990:4e65:7fc3'
     if ipv6_address:
         port = 1680
+        print(ipv6_address)
         connect_to_server(ipv6_address, port,"this is client")
     else:
         print("No global IPv6 address found.")

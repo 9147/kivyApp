@@ -1,5 +1,6 @@
 import socket
 import netifaces
+import json
 
 def get_global_ipv6_address():
     interfaces = netifaces.interfaces()
@@ -27,23 +28,25 @@ def start_server(ipv6_address, port, stop_event):
         print(f"Connected by {addr}")
     
         data = conn.recv(1024)
-        print("Received:", data.decode())
+        received_data=json.loads(data.decode('utf-8'))
+        print("Received:", received_data)
     
         response = "Hello from the server!"
-        conn.sendall(response.encode())
+        conn.sendall(response.encode('utf-8'))
         conn.close()
     server_socket.close()
 
-def connect_to_server(ipv6_address, port,message):
+def connect_to_server(ipv6_address, port,message_dict):
     client_socket = socket.socket(socket.AF_INET6, socket.SOCK_STREAM)
     client_socket.connect((ipv6_address, port, 0, 0))
     print(f"Connected to server at [{ipv6_address}]:{port}")
 
-    # message = "Hello from the client!"
-    client_socket.sendall(message.encode())
+    message = json.dumps(message_dict)
+    client_socket.sendall(message.encode('utf-8'))
 
     data = client_socket.recv(1024)
-    print("Received from server:", data.decode())
+    received_data=json.loads(data.decode('utf-8'))
+    print("Received from server:", received_data)
 
     client_socket.close()
 
