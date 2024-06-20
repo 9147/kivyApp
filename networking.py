@@ -39,8 +39,30 @@ def start_server(ipv6_address, port, stop_event):
         message = received_data.get("message")
         print("Message:", message)
         if message=='Initiating commit push':
-            response = received_data.copy()
-            response["message"]="Commit push initiated"
+            wb = load_workbook("resource/"+received_data.get('class_name')+'.xlsx')
+            sheets = [sheet.title for sheet in wb.worksheets]
+            section_no=received_data.get('section_no').strip(',')
+            section_no=list(map(int,section_no.split(',')))
+            admission_no=received_data.get('admission_no')
+            sheet=wb['cover_page']
+            #in first row find the cell with value admission number
+            match=False
+            for cell in sheet[1]:
+                if cell.value == 'Admission Number':
+                    row:int=2
+                    while row <= sheet.max_row:
+                        if str(sheet.cell(row=row, column=cell.column).value).strip() == str(admission_no).strip():
+                            match=True
+                            selected_row = row
+                        row += 1
+            if match:
+                for section in section_no:
+                    sheet = wb[sheets[section]]
+                    for cell,row in enumerate(sheet[selected_row]):
+                        cell.value = received_data.get('data').get(str(selected_row))[row]
+                wb.save("resource/"+received_data.get('class_name')+'.xlsx')
+                message = json.dumps(response)
+            response={"message":"Commit push initiated"}
             # response['code']=generate_code()
         else:
             response = {"message":"Hello from the server!"}

@@ -749,7 +749,7 @@ class EditScreen(Screen):
                     ip_address=get_global_ipv6_address()
                     if not device['device_ip'].startswith('fe80') and not device['device_ip'].startswith('fd') and device['device_ip'] != '::1' and device['device_ip'] != ip_address:
                         sheets = [sheet.title for sheet in self.workbook.worksheets]
-                        section_no=self.section_no
+                        section_no=self.section_no.strip(',')
                         section_no=list(map(int,section_no.split(',')))
                         admission_no=self.values[1][1]
                         sheet=self.workbook['cover_page']
@@ -766,7 +766,7 @@ class EditScreen(Screen):
                         result= {}
                         if match:
                             for section in section_no:
-                                result[section]=str(self.workbook[sheets[section]][row].value).strip()
+                                result[section]=[a.value for a in self.workbook[sheets[section]][selected_row]]
                             print("results:",result)
                         connect_to_server(device['device_ip'],1680,{"message":"Initiating commit push","commit_no":str(response.json()['commit_no']),"admission_no":self.values[1][1],"class_name":self.workbook_active.split('.')[0],"section_no":self.section_no,"results":result})
             else:
