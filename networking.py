@@ -37,11 +37,13 @@ def start_server(ipv6_address, port, stop_event):
         received_data=json.loads(data.decode('utf-8'))
         print("Received:", received_data)
         message = received_data.get("message")
-        response = {"message":"Hello from the server!"}
+        print("Message:", message)
         if message=='Initiating commit push':
             response = received_data.copy()
             response["message"]="Commit push initiated"
             # response['code']=generate_code()
+        else:
+            response = {"message":"Hello from the server!"}
         response=json.dumps(response)
         conn.sendall(response.encode('utf-8'))
         conn.close()
