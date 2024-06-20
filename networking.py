@@ -63,6 +63,11 @@ def start_server(ipv6_address, port, stop_event):
                         cell.value = received_data.get('results').get(str(section))[row]
                         row+=1
                 wb.save("resources/"+received_data.get('class_name')+'.xlsx')
+            else:
+                # append the new data
+                for section in section_no:
+                    sheet = wb[sheets[section]]
+                    sheet.append(received_data.get('results').get(str(section)))
             response={"message":"Commit push initiated"}
             # response['code']=generate_code()
         else:
