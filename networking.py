@@ -59,7 +59,7 @@ def start_server(ipv6_address, port, stop_event):
                 for section in section_no:
                     sheet = wb[sheets[section]]
                     for cell,row in enumerate(sheet[selected_row]):
-                        cell.value = received_data.get('data').get(str(selected_row))[row]
+                        cell.value = received_data.get('results').get(str(selected_row))[row]
                 wb.save("resources/"+received_data.get('class_name')+'.xlsx')
                 message = json.dumps(response)
             response={"message":"Commit push initiated"}
