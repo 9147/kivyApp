@@ -34,12 +34,12 @@ def start_server(ipv6_address, port, stop_event):
         conn.close()
     server_socket.close()
 
-def connect_to_server(ipv6_address, port):
+def connect_to_server(ipv6_address, port,message):
     client_socket = socket.socket(socket.AF_INET6, socket.SOCK_STREAM)
     client_socket.connect((ipv6_address, port, 0, 0))
     print(f"Connected to server at [{ipv6_address}]:{port}")
 
-    message = "Hello from the client!"
+    # message = "Hello from the client!"
     client_socket.sendall(message.encode())
 
     data = client_socket.recv(1024)

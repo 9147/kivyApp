@@ -748,7 +748,7 @@ class EditScreen(Screen):
                     # check that device ip is not loop back ip
                     ip_address=get_global_ipv6_address()
                     if not device['device_ip'].startswith('fe80') and not device['device_ip'].startswith('fd') and device['device_ip'] != '::1' and device['device_ip'] != ip_address:
-                        connect_to_server(device['device_ip'],"hello this is me!!! "+str(response.json()['commit_no']))
+                        connect_to_server(device['device_ip'],1680,"hello this is me!!! "+str(response.json()['commit_no']))
             else:
                 # create a file named notification.txt
                 with open('notification.txt', 'a') as f:
