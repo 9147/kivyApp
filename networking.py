@@ -63,7 +63,6 @@ def start_server(ipv6_address, port, stop_event):
                         cell.value = received_data.get('results').get(str(section))[row]
                         row+=1
                 wb.save("resources/"+received_data.get('class_name')+'.xlsx')
-                message = json.dumps(response)
             response={"message":"Commit push initiated"}
             # response['code']=generate_code()
         else:
