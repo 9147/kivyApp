@@ -31,6 +31,7 @@ from kivymd.uix.textfield import MDTextField
 from fpdf import FPDF
 from networking import get_global_ipv6_address, start_server, connect_to_server
 from kivy.clock import Clock
+from imageConversion import encode_image_to_base64, decode_base64_to_image
 
 
 
