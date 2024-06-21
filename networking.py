@@ -99,15 +99,6 @@ def process_commit_push(received_data):
                 values = received_data.get('results').get(str(section))
                 for i, value in enumerate(values, start=1):
                     worksheet.cell(row=next_empty_row, column=i, value=value)
-        # open file user.json
-        with open('user.json') as f:
-            user = json.load(f)
-            last_updated_commit_no = user.get("commit_no",0)
-            if last_updated_commit_no + 1 == response.json()['commit_no']:
-                user['commit_no']=response.json()['commit_no']
-                # update the user in the user.json file
-                with open('user.json', 'w') as f:
-                    json.dump(user, f)
         wb.save("resources/" + received_data.get('class_name') + '.xlsx')
     except Exception as e:
         logging.error(f"Error processing commit push: {e}")
