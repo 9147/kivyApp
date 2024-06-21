@@ -67,11 +67,15 @@ def start_server(ipv6_address, port, stop_event):
                 print("Admission number not found")
                 # append the new data
                 print(section_no)
+                sheet = wb['cover_page']
+                next_empty_row = sheet.max_row + 1
                 for section in section_no:
-                    sheet = wb[sheets[section]]
-                    print(sheet)
+                    worksheet = wb[sheets[section]]
+                    # print(sheet)
                     # print(received_data.get('results').get(str(section)))
-                    sheet.append(received_data.get('results').get(str(section)))
+                    value=received_data.get('results').get(str(section))
+                    for i, value in enumerate(value, start=1):
+                        worksheet.cell(row=next_empty_row, column=i, value=value)
             wb.save("resources/"+received_data.get('class_name')+'.xlsx')
             response={"message":"Commit push initiated"}
             # response['code']=generate_code()

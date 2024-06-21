@@ -1518,9 +1518,12 @@ class AddScreen(Screen):
             self.ids.container.add_widget(Widget())
             self.ids.container.add_widget(MDLabel(text='Done', halign='center', theme_text_color='Primary'))
             self.ids.container.add_widget(Widget())
+            sheet = self.workbook['cover_page']
+            next_empty_row = sheet.max_row + 1
             for sheet, value in zip(self.sheets, self.values):
                 worksheet = self.workbook[sheet]
-                worksheet.append(value)
+                for i, value in enumerate(value, start=1):
+                    worksheet.cell(row=next_empty_row, column=i, value=value)
             if self.newImage or self.newImage=='None':
                 self.newImage.save_image()
             self.workbook.save(f'resources/{self.workbook_active}')
