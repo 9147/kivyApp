@@ -785,6 +785,7 @@ class PrintScreen(Screen):
         self.sheets = None
         self.current_sheet_index = 0
         self.values = []
+        
 
     def on_enter(self, *args):
         self.values = []
@@ -1138,6 +1139,7 @@ class AddScreen(Screen):
         self.file_manager = ImageManager()
         self.newImage=None
         self.development_page_count = 0
+        self.section_no=''
 
     def on_enter(self, *args):
         self.values = []
@@ -1482,14 +1484,19 @@ class AddScreen(Screen):
                 # wait until the above call has completed
                 if not (access_accounts['username']==get_username() or get_username() == 'admin'):
                     click_next_button=True
-                print("access accounts",access_accounts)
+                else:
+                    self.section_no+=','+str(self.current_sheet_index)
+                # print("access accounts",access_accounts)
             elif self.sheets[self.current_sheet_index] in ['Image_page']:
                 access_accounts=data[self.sheets[self.current_sheet_index]+"_access"]
                 # print("access accounts",access_accounts)
                 self.create_image_fields(box_layout, self.current_sheet_index)  
                 if not (access_accounts['username']==get_username() or get_username() == 'admin'):
                     click_next_button=True
+                else:
+                    self.section_no+=','+str(self.current_sheet_index)
             elif self.sheets[self.current_sheet_index] in ['feedback_page']:
+                self.section_no+=','+str(self.current_sheet_index)
                 self.create_feedback_fields(box_layout, self.current_sheet_index)
             else:
                 self.create_button_fields(box_layout, self.current_sheet_index)
@@ -1498,6 +1505,8 @@ class AddScreen(Screen):
                 self.development_page_count += 1
                 if not (get_username() in access_accounts or get_username() == 'admin'):
                     click_next_button=True
+                else:
+                    self.section_no+=','+str(self.current_sheet_index)
             self.ids.container.add_widget(Widget())
             self.ids.container.add_widget(scroll_view)
             self.ids.container.add_widget(Widget())
