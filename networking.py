@@ -6,7 +6,8 @@ import os
 import pickle
 import string
 from openpyxl import load_workbook
-from openpyxl.workbook import Workbook
+import threading
+import logging
 
 def get_global_ipv6_address():
     interfaces = netifaces.interfaces()
@@ -20,84 +21,107 @@ def get_global_ipv6_address():
                     return ipv6_addr.split('%')[0]  # Remove the zone index if present
     return None
 
+logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
+
 def start_server(ipv6_address, port, stop_event):
     server_socket = socket.socket(socket.AF_INET6, socket.SOCK_STREAM)
     server_socket.bind((ipv6_address, port, 0, 0))
     server_socket.listen(1)
     server_socket.settimeout(1)  # set a timeout of 1 second
-    print(f"Server listening on [{ipv6_address}]:{port}")
+    logging.info(f"Server listening on [{ipv6_address}]:{port}")
+
     while not stop_event.is_set():
         try:
             conn, addr = server_socket.accept()
         except socket.timeout:
             continue  # if a timeout occurs, continue the loop to check the stop_event
-        print(f"Connected by {addr}")
-    
-        data = conn.recv(1024)
-        received_data=json.loads(data.decode('utf-8'))
-        print("Received:", received_data)
-        message = received_data.get("message")
-        print("Message:", message)
-        if message=='Initiating commit push':
-            wb = load_workbook("resources/"+received_data.get('class_name')+'.xlsx')
-            sheets = [sheet.title for sheet in wb.worksheets]
-            section_no=received_data.get('section_no').strip(',')
-            section_no=list(map(int,section_no.split(',')))
-            admission_no=received_data.get('admission_no')
-            sheet=wb['cover_page']
-            #in first row find the cell with value admission number
-            match=False
-            for cell in sheet[1]:
-                if cell.value == 'Admission Number':
-                    row:int=2
-                    while row <= sheet.max_row:
-                        if str(sheet.cell(row=row, column=cell.column).value).strip() == str(admission_no).strip():
-                            match=True
-                            selected_row = row
-                        row += 1
-            if match:
-                for section in section_no:
-                    sheet = wb[sheets[section]]
-                    row=0
-                    for cell in sheet[selected_row]:
-                        cell.value = received_data.get('results').get(str(section))[row]
-                        row+=1
-                # wb.save("resources/"+received_data.get('class_name')+'.xlsx')
+        except Exception as e:
+            logging.error(f"Error accepting connection: {e}")
+            continue
+        
+        logging.info(f"Connected by {addr}")
+        
+        try:
+            data = conn.recv(1024)
+            received_data = json.loads(data.decode('utf-8'))
+            logging.info(f"Received: {received_data}")
+
+            message = received_data.get("message")
+            logging.info(f"Message: {message}")
+
+            if message == 'Initiating commit push':
+                process_commit_push(received_data)
+                response = {"message": "Commit push initiated"}
             else:
-                print("Admission number not found")
-                # append the new data
-                print(section_no)
-                sheet = wb['cover_page']
-                next_empty_row = sheet.max_row + 1
-                for section in section_no:
-                    worksheet = wb[sheets[section]]
-                    # print(sheet)
-                    # print(received_data.get('results').get(str(section)))
-                    value=received_data.get('results').get(str(section))
-                    for i, value in enumerate(value, start=1):
-                        worksheet.cell(row=next_empty_row, column=i, value=value)
-            wb.save("resources/"+received_data.get('class_name')+'.xlsx')
-            response={"message":"Commit push initiated"}
-            # response['code']=generate_code()
-        else:
-            response = {"message":"Hello from the server!"}
-        response=json.dumps(response)
-        conn.sendall(response.encode('utf-8'))
-        conn.close()
+                response = {"message": "Hello from the server!"}
+            
+            response = json.dumps(response)
+            conn.sendall(response.encode('utf-8'))
+        except Exception as e:
+            logging.error(f"Error processing data: {e}")
+        finally:
+            conn.close()
     server_socket.close()
 
-def connect_to_server(ipv6_address, port,message_dict):
+def process_commit_push(received_data):
+    try:
+        wb = load_workbook("resources/" + received_data.get('class_name') + '.xlsx')
+        sheets = [sheet.title for sheet in wb.worksheets]
+        section_no = received_data.get('section_no').strip(',').split(',')
+        section_no = list(map(int, section_no))
+        admission_no = received_data.get('admission_no')
+        sheet = wb['cover_page']
+
+        match = False
+        for cell in sheet[1]:
+            if cell.value == 'Admission Number':
+                row = 2
+                while row <= sheet.max_row:
+                    if str(sheet.cell(row=row, column=cell.column).value).strip() == str(admission_no).strip():
+                        match = True
+                        selected_row = row
+                    row += 1
+        
+        if match:
+            for section in section_no:
+                sheet = wb[sheets[section]]
+                row = 0
+                for cell in sheet[selected_row]:
+                    cell.value = received_data.get('results').get(str(section))[row]
+                    row += 1
+        else:
+            logging.info("Admission number not found")
+            sheet = wb['cover_page']
+            next_empty_row = sheet.max_row + 1
+            for section in section_no:
+                worksheet = wb[sheets[section]]
+                values = received_data.get('results').get(str(section))
+                for i, value in enumerate(values, start=1):
+                    worksheet.cell(row=next_empty_row, column=i, value=value)
+        
+        wb.save("resources/" + received_data.get('class_name') + '.xlsx')
+    except Exception as e:
+        logging.error(f"Error processing commit push: {e}")
+
+def connect_to_server(ipv6_address, port, message_dict, timeout=5):
     client_socket = socket.socket(socket.AF_INET6, socket.SOCK_STREAM)
-    client_socket.connect((ipv6_address, port, 0, 0))
-    print(f"Connected to server at [{ipv6_address}]:{port}")
+    client_socket.settimeout(timeout)
+    try:
+        client_socket.connect((ipv6_address, port, 0, 0))
+        logging.info(f"Connected to server at [{ipv6_address}]:{port}")
 
-    message = json.dumps(message_dict)
-    client_socket.sendall(message.encode('utf-8'))
+        message = json.dumps(message_dict)
+        client_socket.sendall(message.encode('utf-8'))
 
-    data = client_socket.recv(1024)
-    received_data=json.loads(data.decode('utf-8'))  
-    print("Received from server:", received_data)
-    client_socket.close()
+        data = client_socket.recv(1024)
+        received_data = json.loads(data.decode('utf-8'))
+        logging.info(f"Received from server: {received_data}")
+    except socket.timeout:
+        logging.error(f"Connection to [{ipv6_address}]:{port} timed out")
+    except Exception as e:
+        logging.error(f"Error connecting to server: {e}")
+    finally:
+        client_socket.close()
 
 def generate_code():
     # generate a random 6 alpha numbric code
