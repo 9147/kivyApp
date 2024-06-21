@@ -64,9 +64,12 @@ def start_server(ipv6_address, port, stop_event):
                         row+=1
                 wb.save("resources/"+received_data.get('class_name')+'.xlsx')
             else:
+                print("Admission number not found")
                 # append the new data
+                print(section_no)
                 for section in section_no:
                     sheet = wb[sheets[section]]
+                    print(received_data.get('results').get(str(section)))
                     sheet.append(received_data.get('results').get(str(section)))
             response={"message":"Commit push initiated"}
             # response['code']=generate_code()
