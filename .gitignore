@@ -1,2 +1,11 @@
 myenv
 .idea
+resources/
+.venv
+scheme.json
+dist/
+build/
+token.json
+user.json
+notification.txt
+__pycache__/
