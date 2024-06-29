@@ -61,10 +61,10 @@ def start_server(ipv6_address, port, stop_event):
                         # update the user in the user.json file
                         with open('user.json', 'w') as f:
                             json.dump(user, f)
-                response = {"message": "Commit push initiated"}
+                response = json.dump({"message": "Commit push initiated"})
                 conn.sendall(response.encode('utf-8'))
             else:
-                response = {"message": "Hello from the server!"}
+                response = json.dump({"message": "Hello from the server!"})
                 conn.sendall(response.encode('utf-8'))
         except Exception as e:
             logging.error(f"Error processing data: {e}")
