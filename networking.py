@@ -48,7 +48,7 @@ def start_server(ipv6_address, port, stop_event):
 
             message = received_data.get("message")
             logging.info(f"Message: {message}")
-            print(message == 'Initiating commit push','Initiating commit push')
+            logging.info(f"Initiating commit push: {message == 'Initiating commit push'}")
             if message == 'Initiating commit push':
                 print("Entered!!")
                 process_commit_push(received_data)
