@@ -1595,6 +1595,9 @@ class MainApp(MDApp):
         global url
         self.url = url
         self.sm = ScreenManager()
+        # check if there is a resources folder
+        if not os.path.exists('resources'):
+            os.makedirs('resources')
         self.sm.add_widget(LoginScreen(name='login'))
         self.sm.add_widget(HomeScreen(name='home'))
         self.sm.add_widget(EditScreen(name='edit'))
