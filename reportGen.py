@@ -344,7 +344,6 @@ class HomeScreen(Screen):
 
             with open('user.json', 'w') as f:
                 json.dump(user, f)
-
         get_data_scheme()
 
 
@@ -793,9 +792,14 @@ class EditScreen(Screen):
                                         selected_row = row
                                     row += 1
                         result= {}
+                        files={}
                         if match:
                             for section in section_no:
-                                result[section]=[a.value for a in self.workbook[sheets[section]][selected_row]]
+                                for a in self.workbook[sheets[section]][selected_row]:
+                                    if check_if_path(a.value):
+                                        # result[section]='file_to_share'+str(file_count)
+                                        files[a.value]=encode_image_to_base64(a.value)
+                                    result[section]=a.value
                             print("results:",result)
                             # open file user.json
                             with open('user.json') as f:
@@ -811,7 +815,7 @@ class EditScreen(Screen):
                                     # update the user in the user.json file
                                     with open('user.json', 'w') as f:
                                         json.dump(user, f)
-                        connect_to_server(device['device_ip'],1680,{"message":"Initiating commit push","commit_no":str(response.json()['commit_no']),"admission_no":self.values[1][1],"class_name":self.workbook_active.split('.')[0],"section_no":self.section_no,"results":result})
+                        connect_to_server(device['device_ip'],1680,{"message":"Initiating commit push","commit_no":str(response.json()['commit_no']),"admission_no":self.values[1][1],"class_name":self.workbook_active.split('.')[0],"section_no":self.section_no,"results":result,'file_count':file_count,'files':files,'file_names':file_names})
             else:
                 # create a file named notification.txt
                 with open('notification.txt', 'a') as f:
@@ -1598,8 +1602,14 @@ class AddScreen(Screen):
                                         selected_row = row
                                     row += 1
                         result= {}
+                        files={}
                         if match:
                             for section in section_no:
+                                for a in self.workbook[sheets[section]][selected_row]:
+                                    if check_if_path(a.value):
+                                        # result[section]='file_to_share'+str(file_count)
+                                        files[a.value] = encode_image_to_base64(a.value)
+                                    result[section]=a.value
                                 result[section]=[a.value for a in self.workbook[sheets[section]][selected_row]]
                             print("results:",result)
                             # open file user.json
@@ -1616,7 +1626,7 @@ class AddScreen(Screen):
                                     # update the user in the user.json file
                                     with open('user.json', 'w') as f:
                                         json.dump(user, f)
-                        connect_to_server(device['device_ip'],1680,{"message":"Initiating commit push","commit_no":str(response.json()['commit_no']),"admission_no":self.values[1][1],"class_name":self.workbook_active.split('.')[0],"section_no":self.section_no,"results":result})
+                        connect_to_server(device['device_ip'],1680,{"message":"Initiating commit push","commit_no":str(response.json()['commit_no']),"admission_no":self.values[1][1],"class_name":self.workbook_active.split('.')[0],"section_no":self.section_no,"results":result,'files':files})
             else:
                 # create a file named notification.txt
                 with open('notification.txt', 'a') as f:
@@ -1926,6 +1936,10 @@ def get_height(pdf, text, width):
     lines = math.ceil(word_length / width)
     # print(word_length,text, lines)
     return lines
+
+# check if the value is a path
+def check_if_path(path):
+    return os.path.exists(path) and os.path.isfile(path)
 
 def get_username():
     with open('user.json', 'r') as f:

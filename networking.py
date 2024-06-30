@@ -8,6 +8,8 @@ import string
 from openpyxl import load_workbook
 import threading
 import logging
+from imageConversion import decode_base64_to_image
+from reportGen import check_if_path
 
 def get_global_ipv6_address():
     interfaces = netifaces.interfaces()
@@ -96,13 +98,24 @@ def process_commit_push(received_data):
                         selected_row = row
                     row += 1
         
-        
+        # check if there is recources folder
+        if not os.path.exists('resources'):
+            os.makedirs('resources')
+        if not os.path.exists('resources/images'):
+            os.makedirs('resources/images')
+        if not os.path.exists(f'resources/images/{admission_no}'):
+                os.makedirs(f'resources/images/{admission_no}')
+        file=received_data['files']
         if match:
             for section in section_no:
                 sheet = wb[sheets[section]]
                 row = 0
                 for cell in sheet[selected_row]:
-                    cell.value = received_data.get('results').get(str(section))[row]
+                    val = received_data.get('results').get(str(section))[row]
+                    if check_if_path(val):
+                        decode_base64_to_image(file[val],val)
+                    else:
+                        cell.value = val 
                     row += 1
         else:
             logging.info("Admission number not found")
@@ -112,6 +125,9 @@ def process_commit_push(received_data):
                 worksheet = wb[sheets[section]]
                 values = received_data.get('results').get(str(section))
                 for i, value in enumerate(values, start=1):
+                    for a in value:
+                        if check_if_path(a):
+                            decode_base64_to_image(file[a],a)
                     worksheet.cell(row=next_empty_row, column=i, value=value)
         wb.save("resources/" + received_data.get('class_name') + '.xlsx')
     except Exception as e:
