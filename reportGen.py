@@ -35,9 +35,6 @@ import os
 from dependant import *
 
 
-url = "https://0000manoj0000.pythonanywhere.com/"
-# url = 'http://127.0.0.1:8000/'
-
 Builder.load_string('''
 #:import toast kivymd.toast.toast
                     

@@ -5,6 +5,8 @@ import requests
 import os
 import math
 
+url = "https://0000manoj0000.pythonanywhere.com/"
+# url = 'http://127.0.0.1:8000/'
 
 def store_token(token):
     with open('token.json', 'w') as f:
