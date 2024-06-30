@@ -317,6 +317,10 @@ class LoginScreen(Screen, MDBoxLayout):
 class HomeScreen(Screen):
 
     def on_enter(self, *args):
+        # open user.json file
+        # with open('user.json') as f:
+        #     user = json.load(f)
+            
         get_data_scheme()
 
 
@@ -773,8 +777,13 @@ class EditScreen(Screen):
                             with open('user.json') as f:
                                 user = json.load(f)
                                 last_updated_commit_no = user.get("commit_no",0)
+                                if last_updated_commit_no==0:
+                                    user['commit_no']={self.workbook_active.split('.')[0]:0}
+                                    last_updated_commit_no = 0
+                                else:
+                                    last_updated_commit_no = user.get(self.workbook_active.split('.')[0],0)
                                 if last_updated_commit_no + 1 == response.json()['commit_no']:
-                                    user['commit_no']=response.json()['commit_no']
+                                    user['commit_no'][self.workbook_active.split('.'[0])]=response.json()['commit_no']
                                     # update the user in the user.json file
                                     with open('user.json', 'w') as f:
                                         json.dump(user, f)
@@ -1569,15 +1578,20 @@ class AddScreen(Screen):
                             for section in section_no:
                                 result[section]=[a.value for a in self.workbook[sheets[section]][selected_row]]
                             print("results:",result)
-                        # open file user.json
-                        with open('user.json') as f:
-                            user = json.load(f)
-                            last_updated_commit_no = user.get("commit_no",0)
-                            if last_updated_commit_no + 1 == response.json()['commit_no']:
-                                user['commit_no']=response.json()['commit_no']
-                                # update the user in the user.json file
-                                with open('user.json', 'w') as f:
-                                    json.dump(user, f)
+                            # open file user.json
+                            with open('user.json') as f:
+                                user = json.load(f)
+                                last_updated_commit_no = user.get("commit_no",0)
+                                if last_updated_commit_no==0:
+                                    user['commit_no']={self.workbook_active.split('.')[0]:0}
+                                    last_updated_commit_no = 0
+                                else:
+                                    last_updated_commit_no = user.get(self.workbook_active.split('.')[0],0)
+                                if last_updated_commit_no + 1 == response.json()['commit_no']:
+                                    user['commit_no'][self.workbook_active.split('.'[0])]=response.json()['commit_no']
+                                    # update the user in the user.json file
+                                    with open('user.json', 'w') as f:
+                                        json.dump(user, f)
                         connect_to_server(device['device_ip'],1680,{"message":"Initiating commit push","commit_no":str(response.json()['commit_no']),"admission_no":self.values[1][1],"class_name":self.workbook_active.split('.')[0],"section_no":self.section_no,"results":result})
             else:
                 # create a file named notification.txt
