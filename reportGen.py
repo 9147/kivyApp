@@ -173,7 +173,6 @@ Builder.load_string('''
         orientation: 'vertical'
         size_hint: (1, 1)
         pos_hint: {"center_x": 0.5, "center_y": 0.5}
-        
 
 ''')
 
@@ -326,10 +325,26 @@ class HomeScreen(Screen):
                     self.manager.current = 'login'
         else:
             self.manager.current = 'login'
+
         # open user.json file
-        # with open('user.json') as f:
-        #     user = json.load(f)
-            
+        access_files = []
+        with open('scheme.json') as f:
+            data = json.load(f)
+            for d in data['classes']:
+                access_files.append({d['name']:d['commit_number']})
+        with open('user.json') as f:
+            user = json.load(f)
+            if user.get('commit_no', None) is None:
+                user['commit_no'] = {}
+            for file in access_files:
+                if user['commit_no'].get(file, None) is None:
+                    user['commit_no'][file] = 0
+                if user['commit_no'][file]<access_files[file]:
+                    toast(f"You are lacking by {access_files[file]-user['commit_no'][file]} commits for class {file}")
+
+            with open('user.json', 'w') as f:
+                json.dump(user, f)
+
         get_data_scheme()
 
 
@@ -1754,6 +1769,9 @@ class MainApp(MDApp):
         response = requests.post(url, headers=headers, data=data)
         if response.status_code == 200:
             store_token("")
+            # clear the user.json file
+            with open('user.json', 'w') as f:
+                json.dump({}, f)
         self.sm.get_screen('login').ids['username'].text = ''
         self.sm.get_screen('login').ids['password'].text = ''
 
