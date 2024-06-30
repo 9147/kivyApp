@@ -32,6 +32,7 @@ from fpdf import FPDF
 from networking import get_global_ipv6_address, start_server, connect_to_server
 from kivy.clock import Clock
 from imageConversion import encode_image_to_base64, decode_base64_to_image
+import os
 
 
 
@@ -317,10 +318,14 @@ class LoginScreen(Screen, MDBoxLayout):
 class HomeScreen(Screen):
 
     def on_enter(self, *args):
-        with open('user.json') as f:
-            user = json.load(f)
-            if user.get('username', None) is None:
-                self.manager.current = 'login'
+        # check if user.json exists
+        if os.path.exists('user.json'):
+            with open('user.json') as f:
+                user = json.load(f)
+                if user.get('username', None) is None:
+                    self.manager.current = 'login'
+        else:
+            self.manager.current = 'login'
         # open user.json file
         # with open('user.json') as f:
         #     user = json.load(f)
