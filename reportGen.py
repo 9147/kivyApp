@@ -317,6 +317,10 @@ class LoginScreen(Screen, MDBoxLayout):
 class HomeScreen(Screen):
 
     def on_enter(self, *args):
+        with open('user.json') as f:
+            user = json.load(f)
+            if user.get('username', None) is None:
+                self.manager.current = 'login'
         # open user.json file
         # with open('user.json') as f:
         #     user = json.load(f)
