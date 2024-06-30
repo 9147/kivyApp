@@ -327,11 +327,11 @@ class HomeScreen(Screen):
             self.manager.current = 'login'
 
         # open user.json file
-        access_files = []
+        access_files = {}
         with open('scheme.json') as f:
             data = json.load(f)
             for d in data['classes']:
-                access_files.append({d['name']:d['commit_number']})
+                access_files[d['name']]=d['commit_number']
         with open('user.json') as f:
             user = json.load(f)
             if user.get('commit_no', None) is None:
@@ -339,7 +339,7 @@ class HomeScreen(Screen):
             for file in access_files:
                 if user['commit_no'].get(file, None) is None:
                     user['commit_no'][file] = 0
-                if user['commit_no'][file]<access_files[file]:
+                if user['commit_no'][file] < access_files[file]:
                     toast(f"You are lacking by {access_files[file]-user['commit_no'][file]} commits for class {file}")
 
             with open('user.json', 'w') as f:
