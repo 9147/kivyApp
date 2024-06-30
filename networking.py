@@ -6,10 +6,9 @@ import os
 import pickle
 import string
 from openpyxl import load_workbook
-import threading
 import logging
 from imageConversion import decode_base64_to_image
-from reportGen import check_if_path
+from dependant import check_if_path
 
 def get_global_ipv6_address():
     interfaces = netifaces.interfaces()
