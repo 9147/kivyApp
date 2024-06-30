@@ -811,7 +811,7 @@ class EditScreen(Screen):
                                     # update the user in the user.json file
                                     with open('user.json', 'w') as f:
                                         json.dump(user, f)
-                        connect_to_server(device['device_ip'],1680,{"message":"Initiating commit push","commit_no":str(response.json()['commit_no']),"admission_no":self.values[1][1],"class_name":self.workbook_active.split('.')[0],"section_no":self.section_no,"results":result,'files':files,'file_names':file_names})
+                        connect_to_server(device['device_ip'],1680,{"message":"Initiating commit push","commit_no":str(response.json()['commit_no']),"admission_no":self.values[1][1],"class_name":self.workbook_active.split('.')[0],"section_no":self.section_no,"results":result,'files':files})
             else:
                 # create a file named notification.txt
                 with open('notification.txt', 'a') as f:
