@@ -37,9 +37,8 @@ def process_commit_push(received_data):
                 sheet = wb[sheets[section]]
                 row = 0
                 for cell in sheet[selected_row]:
-                    print(row,received_data.get('results').get(str(section)),section)
                     val = received_data.get('results').get(str(section))[row]
-                    if check_if_path(val):
+                    if type(val)==str and os.path.exists('/'.join(val.split('/')[:-1])):
                         decode_base64_to_image(file[val],val)
                     else:
                         cell.value = val 
@@ -53,7 +52,7 @@ def process_commit_push(received_data):
                 values = received_data.get('results').get(str(section))
                 for i, value in enumerate(values, start=1):
                     for a in value:
-                        if check_if_path(a):
+                        if a and  os.path.exists('/'.join(val.split('/')[:-1])):
                             decode_base64_to_image(file[a],a)
                     worksheet.cell(row=next_empty_row, column=i, value=value)
         wb.save("resources/" + received_data.get('class_name') + '.xlsx')

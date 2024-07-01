@@ -152,6 +152,7 @@ def get_height(pdf, text, width):
 def check_if_path(path):
     return os.path.exists(path) and os.path.isfile(path)
 
+
 def get_username():
     with open('user.json', 'r') as f:
         data = json.load(f)
