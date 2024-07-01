@@ -9,6 +9,7 @@ from openpyxl import load_workbook
 import logging
 from imageConversion import decode_base64_to_image
 from dependant import check_if_path
+import threading
 
 buffer_size=1024*1024*20
 
@@ -134,25 +135,33 @@ def process_commit_push(received_data):
     except Exception as e:
         logging.error(f"Error processing commit push: {e}")
 
-def connect_to_server(ipv6_address, port, message_dict, timeout=5):
-    client_socket = socket.socket(socket.AF_INET6, socket.SOCK_STREAM)
-    client_socket.settimeout(timeout)
-    try:
-        client_socket.connect((ipv6_address, port, 0, 0))
-        logging.info(f"Connected to server at [{ipv6_address}]:{port}")
+def connect_to_server_thread(device_ip, port, message_dict, timeout=5):
 
-        message = json.dumps(message_dict)
-        client_socket.sendall(message.encode('utf-8'))
+    def connect_to_server(ipv6_address, port, message_dict, timeout):
+        client_socket = socket.socket(socket.AF_INET6, socket.SOCK_STREAM)
+        client_socket.settimeout(timeout)
+        try:
+            client_socket.connect((ipv6_address, port, 0, 0))
+            logging.info(f"Connected to server at [{ipv6_address}]:{port}")
 
-        data = client_socket.recv(buffer_size)
-        received_data = json.loads(data.decode('utf-8'))
-        logging.info(f"Received from server: {received_data}")
-    except socket.timeout:
-        logging.error(f"Connection to [{ipv6_address}]:{port} timed out")
-    except Exception as e:
-        logging.error(f"Error connecting to server: {e}")
-    finally:
-        client_socket.close()
+            message = json.dumps(message_dict)
+            client_socket.sendall(message.encode('utf-8'))
+
+            data = client_socket.recv(buffer_size)
+            received_data = json.loads(data.decode('utf-8'))
+            logging.info(f"Received from server: {received_data}")
+        except socket.timeout:
+            logging.error(f"Connection to [{ipv6_address}]:{port} timed out")
+        except Exception as e:
+            logging.error(f"Error connecting to server: {e}")
+        finally:
+            client_socket.close()
+
+    thread = threading.Thread(target=connect_to_server, args=(device_ip, port, message_dict, timeout))
+    thread.start()
+
+        
+    
 
 def generate_code():
     # generate a random 6 alpha numbric code

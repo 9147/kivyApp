@@ -28,7 +28,7 @@ from openpyxl import load_workbook
 from kivy.uix.scrollview import ScrollView
 from kivymd.uix.textfield import MDTextField
 from fpdf import FPDF
-from networking import get_global_ipv6_address, start_server, connect_to_server
+from networking import get_global_ipv6_address, start_server, connect_to_server_thread
 from kivy.clock import Clock
 from imageConversion import encode_image_to_base64, decode_base64_to_image
 import os
@@ -767,6 +767,20 @@ class EditScreen(Screen):
             response = requests.post(url, headers=headers, data=data)
             if response.status_code == 200:
                 toast('Server notified successfully\n Your commit number is: '+str(response.json()['commit_no']))
+                # open file user.json
+                with open('user.json') as f:
+                    user = json.load(f)
+                    last_updated_commit_no = user.get("commit_no",0)
+                    if last_updated_commit_no==0:
+                        user['commit_no']={self.workbook_active.split('.')[0]:0}
+                        last_updated_commit_no = 0
+                    else:
+                        last_updated_commit_no = user.get(self.workbook_active.split('.')[0],0)
+                    if last_updated_commit_no + 1 == response.json()['commit_no']:
+                        user['commit_no'][self.workbook_active.split('.')[0]]=response.json()['commit_no']
+                        # update the user in the user.json file
+                        with open('user.json', 'w') as f:
+                            json.dump(user, f)
                 print(response.json()['devices'])
                 for device in response.json()['devices']:
                     # check that device ip is not loop back ip
@@ -811,7 +825,7 @@ class EditScreen(Screen):
                                     # update the user in the user.json file
                                     with open('user.json', 'w') as f:
                                         json.dump(user, f)
-                        connect_to_server(device['device_ip'],1680,{"message":"Initiating commit push","commit_no":str(response.json()['commit_no']),"admission_no":self.values[1][1],"class_name":self.workbook_active.split('.')[0],"section_no":self.section_no,"results":result,'files':files})
+                        connect_to_server_thread(device['device_ip'],1680,{"message":"Initiating commit push","commit_no":str(response.json()['commit_no']),"admission_no":self.values[1][1],"class_name":self.workbook_active.split('.')[0],"section_no":self.section_no,"results":result,'files':files})
             else:
                 # create a file named notification.txt
                 with open('notification.txt', 'a') as f:
@@ -1577,6 +1591,20 @@ class AddScreen(Screen):
             response = requests.post(url, headers=headers, data=data)
             if response.status_code == 200:
                 toast('Server notified successfully\n Your commit number is: '+str(response.json()['commit_no']))
+                # open file user.json
+                with open('user.json') as f:
+                    user = json.load(f)
+                    last_updated_commit_no = user.get("commit_no",0)
+                    if last_updated_commit_no==0:
+                        user['commit_no']={self.workbook_active.split('.')[0]:0}
+                        last_updated_commit_no = 0
+                    else:
+                        last_updated_commit_no = user.get(self.workbook_active.split('.')[0],0)
+                    if last_updated_commit_no + 1 == response.json()['commit_no']:
+                        user['commit_no'][self.workbook_active.split('.')[0]]=response.json()['commit_no']
+                        # update the user in the user.json file
+                        with open('user.json', 'w') as f:
+                            json.dump(user, f)
                 print(response.json()['devices'])
                 for device in response.json()['devices']:
                     # check that device ip is not loop back ip
@@ -1622,7 +1650,8 @@ class AddScreen(Screen):
                                     # update the user in the user.json file
                                     with open('user.json', 'w') as f:
                                         json.dump(user, f)
-                        connect_to_server(device['device_ip'],1680,{"message":"Initiating commit push","commit_no":str(response.json()['commit_no']),"admission_no":self.values[1][1],"class_name":self.workbook_active.split('.')[0],"section_no":self.section_no,"results":result,'files':files})
+                        
+                        connect_to_server_thread(device['device_ip'],1680,{"message":"Initiating commit push","commit_no":str(response.json()['commit_no']),"admission_no":self.values[1][1],"class_name":self.workbook_active.split('.')[0],"section_no":self.section_no,"results":result,'files':files})
             else:
                 # create a file named notification.txt
                 with open('notification.txt', 'a') as f:
