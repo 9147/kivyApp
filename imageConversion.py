@@ -6,6 +6,8 @@ import logging
 
 def compress_image(image_path, quality=80):
     image = Image.open(image_path)
+    if image.mode == 'RGBA':
+        image = image.convert('RGB')
     buffered = io.BytesIO()
     image.save(buffered, format="JPEG", optimize=True, quality=quality)
     return buffered.getvalue()

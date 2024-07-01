@@ -338,7 +338,7 @@ class HomeScreen(Screen):
                     user['commit_no'][file] = 0
                 if user['commit_no'][file] < access_files[file]:
                     toast(f"You are lacking by {access_files[file]-user['commit_no'][file]} commits for class {file}")
-
+                    
 
             with open('user.json', 'w') as f:
                 json.dump(user, f)
@@ -840,6 +840,9 @@ class EditScreen(Screen):
                         'files': files
                         }
 
+                        # print(json_data)  # Debug print to inspect the JSON data
+                        with open('data.json', 'w') as f:
+                            json.dump(json_data, f)
                         connect_to_server_thread(device['device_ip'], 1680, json_data)
             else:
                 # create a file named notification.txt
@@ -1615,6 +1618,7 @@ class AddScreen(Screen):
                         last_updated_commit_no = 0
                     else:
                         last_updated_commit_no = last_updated_commit_no.get(self.workbook_active.split('.')[0],0)
+                    print(last_updated_commit_no,response.json()['commit_no'])
                     if last_updated_commit_no + 1 == response.json()['commit_no']:
                         user['commit_no'][self.workbook_active.split('.')[0]]=response.json()['commit_no']
                         # update the user in the user.json file
@@ -1670,6 +1674,8 @@ class AddScreen(Screen):
                                    "class_name":self.workbook_active.split('.')[0],
                                    "section_no":self.section_no,"results":result,
                                    'files':files}
+                        with open('data.json', 'w') as f:
+                            json.dump(json_data, f)
                         connect_to_server_thread(device['device_ip'],1680,json_data)
             else:
                 # create a file named notification.txt
