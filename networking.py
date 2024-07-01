@@ -10,6 +10,8 @@ import logging
 from imageConversion import decode_base64_to_image
 from dependant import check_if_path
 
+buffer_size=1024*1024*20
+
 def get_global_ipv6_address():
     interfaces = netifaces.interfaces()
     for interface in interfaces:
@@ -43,7 +45,7 @@ def start_server(ipv6_address, port, stop_event):
         logging.info(f"Connected by {addr}")
         
         try:
-            data = conn.recv(1024)
+            data = conn.recv(buffer_size)
             received_data = json.loads(data.decode('utf-8'))
             logging.info(f"Received: {received_data}")
 
@@ -142,7 +144,7 @@ def connect_to_server(ipv6_address, port, message_dict, timeout=5):
         message = json.dumps(message_dict)
         client_socket.sendall(message.encode('utf-8'))
 
-        data = client_socket.recv(1024)
+        data = client_socket.recv(buffer_size)
         received_data = json.loads(data.decode('utf-8'))
         logging.info(f"Received from server: {received_data}")
     except socket.timeout:
