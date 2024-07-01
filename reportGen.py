@@ -809,7 +809,7 @@ class EditScreen(Screen):
                                     if a.value and check_if_path(a.value):
                                         # result[section]='file_to_share'+str(file_count)
                                         files[a.value]=encode_image_to_base64(a.value)
-                                    result[section]=a.value
+                                result[section]=[a.value for a in self.workbook[sheets[section]][selected_row]]
                             print("results:",result)
                             # open file user.json
                             with open('user.json') as f:
@@ -836,7 +836,8 @@ class EditScreen(Screen):
                         }
 
                         print(json_data)  # Debug print to inspect the JSON data
-
+                        with open('data.json', 'w') as f:
+                            json.dump(json_data, f)
                         connect_to_server_thread(device['device_ip'], 1680, json_data)
             else:
                 # create a file named notification.txt
@@ -1645,7 +1646,6 @@ class AddScreen(Screen):
                                     if a.value and check_if_path(a.value):
                                         # result[section]='file_to_share'+str(file_count)
                                         files[a.value] = encode_image_to_base64(a.value)
-                                    result[section]=a.value
                                 result[section]=[a.value for a in self.workbook[sheets[section]][selected_row]]
                             print("results:",result)
                             # open file user.json

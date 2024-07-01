@@ -1,55 +1,67 @@
-import socket
-import netifaces
+import json
+import os
+import logging
+from openpyxl import load_workbook
+from openpyxl.workbook import Workbook
+from dependant import check_if_path
+from imageConversion import decode_base64_to_image
 
-def get_global_ipv6_address():
-    interfaces = netifaces.interfaces()
-    for interface in interfaces:
-        addresses = netifaces.ifaddresses(interface)
-        if netifaces.AF_INET6 in addresses:
-            for addr in addresses[netifaces.AF_INET6]:
-                ipv6_addr = addr['addr']
-                # Check for a global unicast address (not starting with fe80:: or fd00::/8)
-                if ipv6_addr and not ipv6_addr.startswith('fe80') and not ipv6_addr.startswith('fd'):
-                    return ipv6_addr.split('%')[0]  # Remove the zone index if present
-    return None
+def process_commit_push(received_data):
+        wb = load_workbook("resources/" + received_data.get('class_name') + '.xlsx')
+        sheets = [sheet.title for sheet in wb.worksheets]
+        section_no = received_data.get('section_no').strip(',').split(',')
+        section_no = list(map(int, section_no))
+        admission_no = received_data.get('admission_no')
+        sheet = wb['cover_page']
 
-def start_server(ipv6_address, port):
-    server_socket = socket.socket(socket.AF_INET6, socket.SOCK_STREAM)
-    server_socket.bind((ipv6_address, port, 0, 0))
-    server_socket.listen(1)
-    print(f"Server listening on [{ipv6_address}]:{port}")
+        match = False
+        for cell in sheet[1]:
+            if cell.value == 'Admission Number':
+                row = 2
+                while row <= sheet.max_row:
+                    if str(sheet.cell(row=row, column=cell.column).value).strip() == str(admission_no).strip():
+                        match = True
+                        selected_row = row
+                    row += 1
+        
+        # check if there is recources folder
+        if not os.path.exists('resources'):
+            os.makedirs('resources')
+        if not os.path.exists('resources/images'):
+            os.makedirs('resources/images')
+        if not os.path.exists(f'resources/images/{admission_no}'):
+                os.makedirs(f'resources/images/{admission_no}')
+        file=received_data['files']
+        if match:
+            for section in section_no:
+                sheet = wb[sheets[section]]
+                row = 0
+                for cell in sheet[selected_row]:
+                    print(row,received_data.get('results').get(str(section)),section)
+                    val = received_data.get('results').get(str(section))[row]
+                    if check_if_path(val):
+                        decode_base64_to_image(file[val],val)
+                    else:
+                        cell.value = val 
+                    row += 1
+        else:
+            logging.info("Admission number not found")
+            sheet = wb['cover_page']
+            next_empty_row = sheet.max_row + 1
+            for section in section_no:
+                worksheet = wb[sheets[section]]
+                values = received_data.get('results').get(str(section))
+                for i, value in enumerate(values, start=1):
+                    for a in value:
+                        if check_if_path(a):
+                            decode_base64_to_image(file[a],a)
+                    worksheet.cell(row=next_empty_row, column=i, value=value)
+        wb.save("resources/" + received_data.get('class_name') + '.xlsx')
+
+
+
+with open('data.json','r') as f:
+    data = json.load(f)
+    # print(data)
+    process_commit_push(data)
     
-    conn, addr = server_socket.accept()
-    print(f"Connected by {addr}")
-    
-    data = conn.recv(1024)
-    print("Received:", data.decode())
-    
-    response = "Hello from the server!"
-    conn.sendall(response.encode())
-    
-    conn.close()
-    server_socket.close()
-
-def connect_to_server(ipv6_address, port,message):
-    client_socket = socket.socket(socket.AF_INET6, socket.SOCK_STREAM)
-    client_socket.connect((ipv6_address, port, 0, 0))
-    print(f"Connected to server at [{ipv6_address}]:{port}")
-
-    # message = "Hello from the client!"
-    client_socket.sendall(message.encode())
-
-    data = client_socket.recv(1024)
-    print("Received from server:", data.decode())
-
-    client_socket.close()
-
-
-if __name__ == "__main__":
-    ipv6_address = '2401:4900:4e76:1858:a2cc:7990:4e65:7fc3'
-    if ipv6_address:
-        port = 1680
-        print(ipv6_address)
-        connect_to_server(ipv6_address, port,"this is client")
-    else:
-        print("No global IPv6 address found.")
