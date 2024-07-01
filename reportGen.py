@@ -30,7 +30,7 @@ from kivymd.uix.textfield import MDTextField
 from fpdf import FPDF
 from networking import get_global_ipv6_address, start_server, connect_to_server_thread
 from kivy.clock import Clock
-from imageConversion import encode_image_to_base64, decode_base64_to_image
+from imageConversion import encode_image_to_base64
 import os
 from dependant import *
 
@@ -322,6 +322,7 @@ class HomeScreen(Screen):
         else:
             self.manager.current = 'login'
 
+
         # open user.json file
         access_files = {}
         with open('scheme.json') as f:
@@ -337,6 +338,7 @@ class HomeScreen(Screen):
                     user['commit_no'][file] = 0
                 if user['commit_no'][file] < access_files[file]:
                     toast(f"You are lacking by {access_files[file]-user['commit_no'][file]} commits for class {file}")
+                    
 
             with open('user.json', 'w') as f:
                 json.dump(user, f)
@@ -771,11 +773,14 @@ class EditScreen(Screen):
                 with open('user.json') as f:
                     user = json.load(f)
                     last_updated_commit_no = user.get("commit_no",0)
+                    print(last_updated_commit_no)
                     if last_updated_commit_no==0:
                         user['commit_no']={self.workbook_active.split('.')[0]:0}
                         last_updated_commit_no = 0
                     else:
-                        last_updated_commit_no = user.get(self.workbook_active.split('.')[0],0)
+                        # print(self.workbook_active.split('.')[0])
+                        last_updated_commit_no = last_updated_commit_no.get(self.workbook_active.split('.')[0],0)
+                    # print("commit:",last_updated_commit_no)
                     if last_updated_commit_no + 1 == response.json()['commit_no']:
                         user['commit_no'][self.workbook_active.split('.')[0]]=response.json()['commit_no']
                         # update the user in the user.json file
@@ -819,7 +824,7 @@ class EditScreen(Screen):
                                     user['commit_no']={self.workbook_active.split('.')[0]:0}
                                     last_updated_commit_no = 0
                                 else:
-                                    last_updated_commit_no = user.get(self.workbook_active.split('.')[0],0)
+                                    last_updated_commit_no = last_updated_commit_no.get(self.workbook_active.split('.')[0],0)
                                 if last_updated_commit_no + 1 == response.json()['commit_no']:
                                     user['commit_no'][self.workbook_active.split('.'[0])]=response.json()['commit_no']
                                     # update the user in the user.json file
@@ -1612,7 +1617,7 @@ class AddScreen(Screen):
                         user['commit_no']={self.workbook_active.split('.')[0]:0}
                         last_updated_commit_no = 0
                     else:
-                        last_updated_commit_no = user.get(self.workbook_active.split('.')[0],0)
+                        last_updated_commit_no = last_updated_commit_no.get(self.workbook_active.split('.')[0],0)
                     if last_updated_commit_no + 1 == response.json()['commit_no']:
                         user['commit_no'][self.workbook_active.split('.')[0]]=response.json()['commit_no']
                         # update the user in the user.json file
@@ -1656,7 +1661,7 @@ class AddScreen(Screen):
                                     user['commit_no']={self.workbook_active.split('.')[0]:0}
                                     last_updated_commit_no = 0
                                 else:
-                                    last_updated_commit_no = user.get(self.workbook_active.split('.')[0],0)
+                                    last_updated_commit_no = last_updated_commit_no.get(self.workbook_active.split('.')[0],0)
                                 if last_updated_commit_no + 1 == response.json()['commit_no']:
                                     user['commit_no'][self.workbook_active.split('.'[0])]=response.json()['commit_no']
                                     # update the user in the user.json file

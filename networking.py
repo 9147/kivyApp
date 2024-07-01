@@ -64,7 +64,7 @@ def start_server(ipv6_address, port, stop_event):
                         user['commit_no']={received_data['class_name']:0}
                         last_updated_commit_no = 0
                     else:
-                        last_updated_commit_no = user.get(received_data['class_name'],0)
+                        last_updated_commit_no = last_updated_commit_no.get(received_data['class_name'],0)
                     if last_updated_commit_no + 1 == received_data['commit_no']:
                         user['commit_no'][received_data['class_name']]=received_data['commit_no']
                         # update the user in the user.json file
