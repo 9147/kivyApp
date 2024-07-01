@@ -338,7 +338,7 @@ class HomeScreen(Screen):
                     user['commit_no'][file] = 0
                 if user['commit_no'][file] < access_files[file]:
                     toast(f"You are lacking by {access_files[file]-user['commit_no'][file]} commits for class {file}")
-                    
+
 
             with open('user.json', 'w') as f:
                 json.dump(user, f)
@@ -840,9 +840,6 @@ class EditScreen(Screen):
                         'files': files
                         }
 
-                        print(json_data)  # Debug print to inspect the JSON data
-                        with open('data.json', 'w') as f:
-                            json.dump(json_data, f)
                         connect_to_server_thread(device['device_ip'], 1680, json_data)
             else:
                 # create a file named notification.txt
