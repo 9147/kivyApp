@@ -1673,9 +1673,11 @@ class AddScreen(Screen):
                                    "admission_no":self.values[1][1],
                                    "class_name":self.workbook_active.split('.')[0],
                                    "section_no":self.section_no,"results":result,
-                                   'files':files}
-                        with open('data.json', 'w') as f:
-                            json.dump(json_data, f)
+                                   'files': files}
+                        
+                        with open('data.json','w') as f:
+                            json.dump(json_data,f)
+
                         connect_to_server_thread(device['device_ip'],1680,json_data)
             else:
                 # create a file named notification.txt
