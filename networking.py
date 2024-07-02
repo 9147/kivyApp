@@ -54,7 +54,9 @@ def start_server(ipv6_address, port, stop_event):
             logging.info(f"Message: {message}")
             logging.info(f"Initiating commit push: {message == 'Initiating commit push'}")
             if message == 'Initiating commit push':
-                print("Entered!!")
+                # print("Entered!!")
+                with open('data.json','w') as f:
+                    json.dump(received_data,f)
                 process_commit_push(received_data)
                 # open file user.json
                 with open('user.json') as f:
