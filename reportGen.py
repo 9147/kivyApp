@@ -847,7 +847,7 @@ class EditScreen(Screen):
             else:
                 # create a file named notification.txt
                 with open('notification.txt', 'a') as f:
-                    f.write(self.section_no+':'+self.values[1][1]+":"+self.workbook_active.split('.')[0])
+                    f.write("\n"+self.section_no+':'+self.values[1][1]+":"+self.workbook_active.split('.')[0])
                 toast('An error occured while notifying the server')
 
 
@@ -1672,7 +1672,8 @@ class AddScreen(Screen):
                                    "commit_no":str(response.json()['commit_no']),
                                    "admission_no":self.values[1][1],
                                    "class_name":self.workbook_active.split('.')[0],
-                                   "section_no":self.section_no,"results":result,
+                                   "section_no":self.section_no,
+                                   "results":result,
                                    'files': files}
                         
                         with open('data.json','w') as f:
@@ -1682,7 +1683,7 @@ class AddScreen(Screen):
             else:
                 # create a file named notification.txt
                 with open('notification.txt', 'a') as f:
-                    f.write('all:'+self.values[1][1]+":"+self.workbook_active.split('.')[0])
+                    f.write("\n"+self.section_no+":"+self.values[1][1]+":"+self.workbook_active.split('.')[0])
                 toast('An error occured while notifying the server')
 
 

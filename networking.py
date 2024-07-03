@@ -13,6 +13,7 @@ import threading
 
 buffer_size=1024*1024
 CHUNK_SIZE = 1024  # 1 KB
+logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 
 def get_global_ipv6_address():
     interfaces = netifaces.interfaces()
@@ -25,8 +26,6 @@ def get_global_ipv6_address():
                 if ipv6_addr and not ipv6_addr.startswith('fe80') and not ipv6_addr.startswith('fd'):
                     return ipv6_addr.split('%')[0]  # Remove the zone index if present
     return None
-
-logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 
 
 
@@ -42,11 +41,11 @@ def handle_client(conn, addr):
             received_data_bytes += chunk
 
         received_data = json.loads(received_data_bytes.decode('utf-8'))
-        logging.info(f"Received: {received_data}")
+        # logging.info(f"Received: {received_data}")
 
         message = received_data.get("message")
-        logging.info(f"Message: {message}")
-        logging.info(f"Initiating commit push: {message == 'Initiating commit push'}")
+        # logging.info(f"Message: {message}")
+        # logging.info(f"Initiating commit push: {message == 'Initiating commit push'}")
         if message == 'Initiating commit push':
             with open('data.json', 'w') as f:
                 json.dump(received_data, f)
@@ -134,7 +133,7 @@ def process_commit_push(received_data):
                         cell.value = val 
                     row += 1
         else:
-            logging.info("Admission number not found")
+            logging.info("New Entry detected!!")
             sheet = wb['cover_page']
             next_empty_row = sheet.max_row + 1
             for section in section_no:
